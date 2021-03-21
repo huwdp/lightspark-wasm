@@ -1,0 +1,3 @@
+Debian package TODO list:
+    - Add Provide/Replace/Conflict: swf-player ?
+    - see swfdec shlibs.local

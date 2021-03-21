@@ -1,0 +1,196 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_utils_ByteArray_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	import flash.utils.ByteArray;
+	import flash.utils.Endian;
+	import SerializableClass;
+	import CustomSerializableClass;
+	import SerializableClassWithNs;
+	private function appComplete():void
+	{
+		var ba:ByteArray = new ByteArray();
+		
+		Tests.assertEquals(3, ByteArray.defaultObjectEncoding, "Default object encoding");
+		Tests.assertEquals(0, ba.position, "Initial position");
+		Tests.assertEquals(0, ba.length, "Initial length");
+		Tests.assertEquals(Endian.BIG_ENDIAN, ba.endian, "Initial endian");
+
+		ba.writeByte(42);
+		Tests.assertEquals(1, ba.length, "Length after writeByte");
+		ba.writeByte(257); //should only use lower 8 bits and write 1
+		Tests.assertEquals(2, ba.length, "Length after another writeByte");
+		ba.position = 0;
+		Tests.assertEquals(42, ba.readByte(), "readByte");
+		Tests.assertEquals(1, ba.readByte(), "another readByte");
+
+		var ba2:ByteArray = new ByteArray();
+		ba2[0] = 100;
+		ba2[1] = 200
+		ba2[2] = 300;
+		ba.writeBytes(ba2);
+		//should be [42, 1, 100, 200, 300] now
+		Tests.assertEquals(5, ba.length, "Length after writeBytes");
+		Tests.assertEquals(200, ba[3], "Read value written by writeBytes");
+
+		var ba3:ByteArray = new ByteArray();
+		ba3.writeDouble(-4.404500509e-300);
+		Tests.assertEquals(8, ba3.length, "Length after writeDouble");
+		ba3.position = 0;
+		Tests.assertEquals(-4.404500509e-300, ba3.readDouble(), "Read value written by writeDouble");
+
+		var ba4:ByteArray = new ByteArray();
+		ba4.writeFloat(-4.5504006e-10);
+		Tests.assertEquals(4, ba4.length, "Length after writeFloat");
+		ba4.position = 0;
+		Tests.assertEqualsDelta(-4.5504006e-10, ba4.readFloat(), 0.0000000001, "Read value written by writeFloat");
+
+		var ba5:ByteArray = new ByteArray();
+		ba5.writeDouble(-4.404500509e-300);
+		Tests.assertEquals(8, ba5.length, "Length after writeDouble");
+		ba5.writeFloat(-4.5504006e-10);
+		Tests.assertEquals(12, ba5.length, "Length after writeFloat");
+		ba5.position = 0;
+		Tests.assertEquals(-4.404500509e-300, ba5.readDouble(), "Read value written by writeDouble");
+		Tests.assertEqualsDelta(-4.5504006e-10, ba5.readFloat(), 0.0000000001, "Read value written by writeFloat");
+
+		var ba6:ByteArray = new ByteArray;
+		//Create an object with a reference to itself and multiple copies of the same string
+		var complexObj:Object =  new Object();
+		complexObj["int"] = 1;
+		complexObj["number"] = 2.3;
+		complexObj["null"] = null;
+		complexObj["undefined"] = undefined;
+		complexObj["recursive"] = complexObj;
+		complexObj["str1"] = "StringVal";
+		complexObj["str2"] = "StringVal";
+
+		ba6.writeObject(complexObj);
+		Tests.assertEquals(ba6.length, 78, "Serialization length");
+
+		ba6.position = 0;
+		var complexObj2:Object = ba6.readObject();
+
+		Tests.assertEquals(complexObj2["int"], 1, "Int serialization");
+		Tests.assertEquals(complexObj2["number"], 2.3, "Number serialization");
+		Tests.assertEquals(complexObj2["null"], null, "Null serialization");
+		Tests.assertEquals(complexObj2["undefined"], undefined, "Undefined serialization");
+		Tests.assertEquals(complexObj2["recursive"], complexObj2, "Recursive serialization");
+		Tests.assertEquals(complexObj2["str1"], "StringVal", "String serialization - Copy 1");
+		Tests.assertEquals(complexObj2["str2"], "StringVal", "String serialization - Copy 2");
+
+		var ba7:ByteArray = new ByteArray();
+		ba7.writeByte(0xF0);
+		ba7.writeByte(0xE0);
+		ba7.writeByte(0xD0);
+		ba7.writeByte(0xC0);
+		ba7.writeByte(0xB0);
+		ba7.writeByte(0xA0);
+		ba7.writeByte(0x90);
+		ba7.writeByte(0x80);
+
+		ba7.endian = Endian.BIG_ENDIAN;
+		ba7.position = 0;
+		Tests.assertEquals(240, ba7.readUnsignedByte(), "readUnsignedByte (big endian)");
+		ba7.position = 0;
+		Tests.assertEquals(-3872, ba7.readShort(), "readShort (big endian)");
+		ba7.position = 0;
+		Tests.assertEquals(61664, ba7.readUnsignedShort(), "readUnsignedShort (big endian)");
+		ba7.position = 0;
+		Tests.assertEquals(-253701952, ba7.readInt(), "readInt (big endian)");
+		ba7.position = 0;
+		Tests.assertEquals(4041265344, ba7.readUnsignedInt(), "readUnsignedInt (big endian)");
+		ba7.position = 0;
+		Tests.assertEqualsDelta(-5.56616043718606e29, ba7.readFloat(), 1e19, "readFloat (big endian)");
+		ba7.position = 0;
+		Tests.assertEqualsDelta(-5.34656515363983e+235, ba7.readDouble(), 1e225, "readDouble (big endian)");
+
+		ba7.endian = Endian.LITTLE_ENDIAN;
+		ba7.position = 0;
+		Tests.assertEquals(-7952, ba7.readShort(), "readShort (little endian)");
+		ba7.position = 0;
+		Tests.assertEquals(57584, ba7.readUnsignedShort(), "readUnsignedShort (little endian)");
+		ba7.position = 0;
+		Tests.assertEquals(-1060052752, ba7.readInt(), "readInt (little endian)");
+		ba7.position = 0;
+		Tests.assertEquals(3234914544, ba7.readUnsignedInt(), "readUnsignedInt (little endian)");
+		ba7.position = 0;
+		Tests.assertEqualsDelta(-6.527458190917969, ba7.readFloat(), 1e-10, "readFloat (little endian)");
+		ba7.position = 0;
+		Tests.assertEqualsDelta(-5.9196566415987e-306, ba7.readDouble(), 1e-316, "readDouble (little endian)");
+
+
+		var ba8:ByteArray = new ByteArray();
+		ba8.writeUTF("abc");
+		ba8.position = 0;
+		Tests.assertEquals(3, ba8.readShort(), "writeUTF: written length");
+		ba8.position = 0;
+		Tests.assertEquals("abc", ba8.readUTF(), "readUTF after writeUTF");
+
+		var ba9:ByteArray = new ByteArray();
+		ba9.writeObject(128);
+		ba9.position = 0;
+		Tests.assertTrue(ba9[0]==0x04 && ba9[1]==0x81 && ba9[2]==0x00, "U29 serialization");
+		var tmp:Object = ba9.readObject();
+		Tests.assertEquals(tmp, 128, "U29 deserialization");
+
+		var sc:SerializableClass = new SerializableClass(1,2);
+		var ba10:ByteArray = new ByteArray();
+		ba10.writeObject(sc);
+		ba10.position=0;
+		var tmp2:Object = ba10.readObject();
+		Tests.assertTrue(tmp2.a==1 && tmp2.b==2 && getQualifiedClassName(tmp2)=="Object", "Class instance serialized without alias");
+		Tests.assertEquals(12, ba10.length, "Length of serialization without alias");
+
+		registerClassAlias("classalias", SerializableClass);
+		var ba11:ByteArray = new ByteArray();
+		ba11.writeObject(sc);
+		ba11.position=0;
+		var tmp3:Object = ba11.readObject();
+		Tests.assertTrue(tmp3.a==1 && tmp3.b==2 && getQualifiedClassName(tmp3)=="SerializableClass", "Class instance serialized with alias");
+		Tests.assertEquals(22, ba11.length, "Length of serialization with alias");
+
+		var sc2:SerializableClass = new SerializableClass(3,4);
+		var ba12:ByteArray = new ByteArray();
+		ba12.writeObject([sc, sc2]);
+		ba12.position=0;
+		var tmp4:Object = ba12.readObject();
+		Tests.assertEquals(32, ba12.length, "Length of multiple instances of serialized class (traits references test)");
+
+		registerClassAlias("customalias", CustomSerializableClass);
+		var csc:CustomSerializableClass = new CustomSerializableClass();
+		var ba13:ByteArray = new ByteArray();
+		ba13.writeObject(csc);
+		ba13.position=0;
+		var tmp5:Object = ba13.readObject();
+		Tests.assertEquals(true, tmp5.ok, "Custom serialization");
+
+		var scns:SerializableClassWithNs = new SerializableClassWithNs(1,2,3);
+		var ba14:ByteArray = new ByteArray();
+		ba14.writeObject(scns);
+		ba14.position=0;
+		var tmp6:Object = ba14.readObject();
+		Tests.assertTrue(tmp6.a==1 && tmp6.b==2 && tmp6.c==undefined, "Serialize class with namespaces");
+
+		registerClassAlias("aliaswithns", SerializableClassWithNs);
+		var scns2:SerializableClassWithNs = new SerializableClassWithNs(1,2,3);
+		var ba15:ByteArray = new ByteArray();
+		ba15.writeObject(scns2);
+		ba15.position=0;
+		var tmp7:Object = ba15.readObject();
+		var tmp8:SerializableClassWithNs = tmp7 as SerializableClassWithNs;
+		Tests.assertTrue(tmp8.a==1 && tmp8.b==2 && tmp6.c==undefined, "Serialize class with namespaces and register alias");
+
+		Tests.report(visual, this.name);
+	}
+ ]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

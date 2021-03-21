@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_display_BitmapData_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+<![CDATA[
+import flash.display.BitmapData;
+
+private function onMouseDown(e:MouseEvent):void
+{
+	trace("mouseDown ("+e.localX+","+e.localY+") "+e.target);
+	if(e.localX==0)
+		throw Error("The 0th line on the X axis should be ignored");
+}
+
+private function onMouseMove(e:MouseEvent):void
+{
+	trace("mouseMove ("+e.localX+","+e.localY+") "+e.target);
+	if(e.localX==0)
+		throw Error("The 0th line on the X axis should be ignored");
+}
+
+private function appComplete():void
+{
+	var b1:BitmapData = new BitmapData(200,200);
+	var c:DisplayObjectContainer = new Sprite();
+	c.x = 100;
+	c.y = 50;
+	var s:Shape = new Shape();
+	s.graphics.beginFill(0xFFCC00);
+	s.graphics.drawRect(0, 0, 100, 100);
+	c.addChild(s);
+	//Add another Sprite at the top of the hierarchy to test
+	//proper support for transformations
+	var c2:DisplayObjectContainer = new Sprite();
+	c2.x = 50;
+	c2.y = 100;
+	c2.addChild(c);
+
+	b1.draw(c);
+	b1.draw(c,new Matrix(1,0,0,1,100,100));
+	var b2:Bitmap = new Bitmap(b1);
+	visual.addChild(b2);
+
+	var b3:BitmapData = new BitmapData(200,200,true,0xff800000);
+	var s2:Sprite = new Sprite();
+	s2.graphics.beginFill(0x008000, 1);
+	s2.graphics.drawRect(0,0,100,100);
+	s2.graphics.drawRect(20,20,60,60);
+	s2.graphics.endFill();
+	var b4:BitmapData = new BitmapData(100,100,true,0x0);
+	b4.draw(s2);
+	b3.copyPixels(b4, new Rectangle(0,0,100,100), new Point(0, 0),null,null,false);
+	b3.copyPixels(b4, new Rectangle(0,0,100,100), new Point(0, 100),null,null,true);
+	b3.draw(b4, new Matrix(1,0,0,2,100,0));
+	var b5:Bitmap = new Bitmap(b3);
+	b5.x=200;
+	visual.addChild(b5);
+
+	var b6:BitmapData = new BitmapData(200,200,false,0x000000);
+	var b7:Bitmap = new Bitmap(b6);
+	b7.y=200;
+	visual.addChild(b7);
+
+	var b8:BitmapData = new BitmapData(200,200,true,0x000000);
+	var b9:Bitmap = new Bitmap(b8);
+	b9.x=200;
+	b9.y=200;
+	visual.addChild(b9);
+
+	trace("test");
+
+	visual.x=10;
+	visual.y=10;
+
+	visual.addEventListener("mouseDown",onMouseDown);
+	visual.addEventListener("mouseMove",onMouseMove);
+
+}
+]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

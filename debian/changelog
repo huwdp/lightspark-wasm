@@ -1,0 +1,322 @@
+lightspark (0.7.2-0ubuntu1~ppa1) quantal; urgency=low
+
+  * New release
+
+ -- Antti Ajanki <antti.ajanki@iki.fi>  Sat, 16 Mar 2013 13:14:14 +0200
+
+lightspark (0.7.1-0ubuntu1~ppa1) quantal; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sun, 23 Dec 2012 00:38:19 +0100
+
+lightspark (0.7.0-0ubuntu1~ppa1) quantal; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 27 Oct 2012 17:57:52 +0200
+
+lightspark (0.6.0.1-0ubuntu1~ppa1) precise; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sun, 10 Jun 2012 11:29:30 +0200
+
+lightspark (0.5.7-0ubuntu1~ppa2) precise; urgency=low
+
+  * Fix email
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Wed, 16 May 2012 13:09:05 +0200
+
+lightspark (0.5.7-0ubuntu1~ppa1) precise; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <alex@avalon>  Tue, 15 May 2012 23:48:53 +0200
+
+lightspark (0.5.6-0ubuntu1~ppa1) oneiric; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <alex@avalon>  Wed, 11 Apr 2012 23:01:24 +0200
+
+lightspark (0.5.5-0ubuntu1~ppa1) oneiric; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <alex@avalon>  Sun, 11 Mar 2012 16:20:12 +0100
+
+lightspark (0.5.4.1-0ubuntu1~ppa1) precise; urgency=low
+
+  * New release
+
+ -- Jani Monoses <jani@ubuntu.com>  Thu, 02 Feb 2012 10:59:03 +0200
+
+lightspark (0.5.4-0ubuntu1~ppa1) precise; urgency=low
+
+  * New release
+
+ -- Jani Monoses <jani@ubuntu.com>  Tue, 24 Jan 2012 23:45:26 +0200
+
+lightspark (0.5.3-0ubuntu1~ppa2) precise; urgency=low
+
+  * New release
+
+ -- Jani Monoses <jani@ubuntu.com>  Thu, 01 Dec 2011 15:42:15 +0200
+
+lightspark (0.5.2.1-0ubuntu1~ppa1) oneiric; urgency=low
+
+  * New release
+
+ -- Jani Monoses <jani@ubuntu.com>  Fri, 28 Oct 2011 17:18:53 +0300
+
+lightspark (0.5.1-0ubuntu1~ppa1) oneiric; urgency=low
+
+  * New release
+
+ -- Jani Monoses <jani@ubuntu.com>  Wed, 21 Sep 2011 11:56:46 +0300
+
+lightspark (0.5.0-0ubuntu1~ppa) natty; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 02 Jul 2011 15:52:43 +0200
+
+lightspark (0.4.8-0ubuntu1~ppa) natty; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 21 May 2011 20:00:52 +0200
+
+lightspark (0.4.7.1-0ubuntu1~ppa) natty; urgency=low
+
+  * Bugfix release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 05 May 2011 00:24:45 +0200
+
+lightspark (0.4.7-0ubuntu1~ppa) natty; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 28 Apr 2011 04:03:06 +0200
+
+lightspark (0.4.6.1-0ubuntu0) maverick; urgency=low
+
+  * Bugfix release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Fri, 18 Mar 2011 04:21:46 +0100
+
+lightspark (0.4.6-0ubuntu1) maverick; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sun, 13 Mar 2011 16:08:31 +0100
+
+lightspark (0.4.5.3-0ubuntu1) maverick; urgency=low
+
+  * Bugfix release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 19 Feb 2011 04:30:02 +0100
+
+lightspark (0.4.5.2-0ubuntu1) maverick; urgency=low
+
+  * Bugfix release
+
+ -- Timon Van Overveldt <timonvo@gmail.com>  Fri, 04 Feb 2011 00:41:00 +0100
+
+lightspark (0.4.5.1-0ubuntu1) maverick; urgency=low
+
+  * Bugfix release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 16 Dec 2010 06:27:39 +0100
+
+lightspark (0.4.5-0ubuntu1) maverick; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Wed, 08 Dec 2010 17:55:25 +0100
+
+lightspark (0.4.5~rc1-0ubuntu1) lucid; urgency=low
+
+  * New release candidate
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 25 Nov 2010 18:11:49 +0100
+
+lightspark (0.4.4.3-0ubuntu1) lucid; urgency=low
+
+  * Bugfix release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 23 Sep 2010 23:24:46 +0200
+
+lightspark (0.4.4.2-0ubuntu1) lucid; urgency=low
+
+  * Bugfix release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 11 Sep 2010 14:52:03 +0200
+
+lightspark (0.4.4.1-0ubuntu1) lucid; urgency=low
+
+  * Bugfix release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 02 Sep 2010 14:58:38 +0200
+
+lightspark (0.4.4-0ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sun, 29 Aug 2010 13:39:39 +0200
+
+lightspark (0.4.3-0ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Tue, 10 Aug 2010 13:13:08 +0200
+
+lightspark (0.4.3~rc1-0ubuntu1) lucid; urgency=low
+
+  * New release candidate
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sun, 08 Aug 2010 19:30:11 +0200
+
+lightspark (0.4.2.3-0ubuntu1) lucid; urgency=low
+
+  * New point release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Wed, 04 Aug 2010 19:13:32 +0200
+
+lightspark (0.4.2.2-0ubuntu1) lucid; urgency=low
+
+  * New point release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Tue, 27 Jul 2010 04:54:57 +0200
+
+lightspark (0.4.2.1-0ubuntu1) lucid; urgency=low
+
+  * Small bugfix release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 24 Jul 2010 00:35:58 +0200
+
+lightspark (0.4.2-0ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Tue, 20 Jul 2010 04:14:06 +0200
+
+lightspark (0.4.2~rc3-0ubuntu1) lucid; urgency=low
+
+  * New release candidate
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Fri, 16 Jul 2010 22:24:42 +0200
+
+lightspark (0.4.2~rc2-0ubuntu1) lucid; urgency=low
+
+  * New release candidate
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 03 Jul 2010 23:56:37 +0200
+
+lightspark (0.4.2~rc1-0ubuntu1) lucid; urgency=low
+
+  * New release candidate
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 01 Jul 2010 03:20:36 +0200
+
+lightspark (0.4.1-0ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 05 Jun 2010 03:13:43 +0200
+
+lightspark (0.4.0~rc3-0ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 29 May 2010 19:16:49 +0200
+
+lightspark (0.4.0~rc2-0ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sat, 29 May 2010 04:06:21 +0200
+
+lightspark (0.4.0~rc1-ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Fri, 28 May 2010 06:23:06 +0200
+
+lightspark (0.3.9-ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Mon, 24 May 2010 13:14:46 +0200
+
+lightspark (0.3.8-ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Sun, 23 May 2010 01:16:32 +0200
+
+lightspark (0.3.7-ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Fri, 21 May 2010 23:12:25 +0200
+
+lightspark (0.3.6-ubuntu1) lucid; urgency=low
+
+  * New release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 20 May 2010 23:42:28 +0200
+
+lightspark (0.3.5-ubuntu1) lucid; urgency=low
+
+  * A fix in SWF parsing
+  * Show debug message also in standalone version
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Thu, 20 May 2010 02:02:18 +0200
+
+lightspark (0.3.4-ubuntu1) lucid; urgency=low
+
+  * Fixed a bug triggered by compiler optimizations
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Wed, 19 May 2010 19:33:43 +0200
+
+lightspark (0.3.3-ubuntu1) lucid; urgency=low
+
+  * Enable assertions in release builds
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Wed, 19 May 2010 05:26:49 +0200
+
+lightspark (0.3.2-ubuntu1) lucid; urgency=low
+
+  * Enable debug output in release
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Tue, 18 May 2010 21:25:44 +0200
+
+lightspark (0.3.1-ubuntu3) lucid; urgency=low
+
+  * Beta release
+  * Improved robustness
+  * Apply filtering to video
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Tue, 18 May 2010 01:37:37 +0200
+
+lightspark (0.2.1-ubuntu1) lucid; urgency=low
+
+  * Mouse input support
+  * Better tesselation
+  * Plugin packaged
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Tue, 27 Apr 2010 17:31:03 +0200
+
+lightspark (0.2.0-ubuntu1) lucid; urgency=low
+
+  * Youtube support
+
+ -- Alessandro Pignotti <a.pignotti@sssup.it>  Tue, 20 Apr 2010 17:15:05 +0200
+
+lightspark (0.techdemo2) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Jacopo Corbetta <j.corbetta@sssup.it>  Sat, 27 Jun 2009 19:20:39 +0200

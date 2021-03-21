@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_Class_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	import Tests;
+	import flash.events.MouseEvent;
+	import flash.events.Event;
+	private function appComplete():void
+	{
+		Tests.assertEquals(MouseEvent["CLICK"],"click","Accessing property of derived class");
+		Tests.assertEquals(MouseEvent["ENTER_FRAME"],undefined,"Accessing property of parent class from derived class");
+		Tests.assertEquals(Event["ENTER_FRAME"],"enterFrame","Accessing property of parent class");
+
+		var c:Class = DisplayObject;
+		Tests.assertEquals(c, c as Object, "Class object as Object");
+		Tests.assertEquals(true, c is Object, "Class object is Object");
+		Tests.assertEquals(c, c as Class, "Class object as Class");
+		Tests.assertEquals(true, c is Class, "Class object is Class");
+		Tests.assertTrue(Class is Class, "Class is Class");
+		Tests.assertTrue(Class is Object, "Class is Object");
+		Tests.assertFalse(DisplayObject is DisplayObject, "DisplayObject is not DisplayObject");
+
+		var o:Object = DisplayObject as Object;
+		o["test"] = "foobar";
+
+		Tests.assertTrue(o.hasOwnProperty("test"),"hasOwnProperty on classes");
+
+		Tests.report(visual, this.name);
+	}
+	]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

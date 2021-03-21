@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_TestEventDispatcher_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	import Tests;
+	import TestDispatcher;
+	private var listener:TestDispatcher;
+	private var received:int = 0;
+	private function handler(e:Event):void
+	{
+		Tests.assertTrue(e.target is TestDispatcher, "Custom target for implementations of IEventDispatcher");
+		received++;
+		reportIfNeeded();
+	}
+	private function reportIfNeeded():void
+	{
+		if(received==1)
+			Tests.report(visual, this.name);
+	}
+	private function appComplete():void
+	{
+		listener = new TestDispatcher();
+		listener.addEventListener("foo", handler);
+
+		listener.dispatchEvent(new Event("foo"));
+	}
+ ]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

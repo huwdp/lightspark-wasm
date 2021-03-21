@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_XML_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	import Tests;
+	private function appComplete():void
+	{
+		var xml1:XML=new XML("<test1></test1>");
+		var xml2:XML=new XML("<test2></test2>");
+		var xml3:XML=new XML("<test3></test3>");
+		var xml18:XML = xml1.appendChild(xml2);
+		Tests.assertEquals(xml1, xml18, "Object returned by appendChild");
+		xml2.appendChild(xml3);
+		Tests.assertEquals(xml1.toXMLString(),"<test1>\n  <test2>\n    <test3/>\n  </test2>\n</test1>","Appending XML nodes");
+		var xml4:XML=new XML("");
+		Tests.assertEquals(xml4.localName(),null,"localName for empty string");
+		Tests.assertEquals(xml4.nodeKind(),"text","nodeKind for empty string");
+		Tests.assertEquals(null,xml4.name(),"name() for empty string",true);
+
+		var xmllist2:XMLList=new XMLList("<test><child/></test><test2><child2/></test2>");
+		Tests.assertEquals(xmllist2.length(), 2, "XMLList constructed from a string");
+		Tests.assertEquals(xmllist2.child.length(), 1, "XMLList property accessor");
+
+		var xml5:XML=new XML("<person age='22'><name>Alice</name></person>");
+		var xml6:XML=new XML("<person age='22'><name>Alice</name></person>");
+		var xml7:XML=new XML("<person age='22'><name>Bob</name></person>");
+		var xml8:XML=new XML("<person age='99'><name>Alice</name></person>");
+		var xmllist1:Object=new XMLList("<person age='22'><name>Alice</name></person>");
+		var simplexml:XML=new XML("<test>123</test>");
+
+		var flag:Boolean = false;
+		//Enable this when proper AS exception is thrown
+		try
+		{
+			var xml9:XML=new XML("<broken>data<");
+		}
+		catch(e:Error)
+		{
+			flag = true;
+		}
+		Tests.assertTrue(flag, "Exception thrown on error");
+
+		var ba1:ByteArray=new ByteArray();
+		ba1.writeUTFBytes("<test>123</test>");
+		var xml10:XML=new XML(ba1);
+		Tests.assertEquals(simplexml, xml10, "XML from ByteArray");
+
+		var xml11:XML=new XML('<foo a="val1"b="val2"/>');
+		var xml12:XML=new XML('<foo a="val1" b="val2"/>');
+
+		Tests.assertTrue(xml11==xml12, "XML with missing space between properties");
+		Tests.assertTrue(xml5==xml6, "equal nodes");
+		Tests.assertTrue(xml5!=xml7, "inequal child content");
+		Tests.assertTrue(xml5!=xml8, "inequal attribute values");
+		Tests.assertTrue(xml5==xmllist1, "equality: XML and XMLList");
+		Tests.assertTrue(xmllist1==xml5, "equality: XMLList and XML");
+		Tests.assertTrue(simplexml==Object("123"), "equality: simple XML and string");
+		Tests.assertTrue(simplexml==Object(123), "equality: simple XML and integer");
+		Tests.assertTrue(Object("123")==simplexml, "equality: string and simple XML");
+		Tests.assertTrue(Object(123)==simplexml, "equality: integer and simple XML");
+
+		var cdata:XML = new XML("<![CDATA[Lightspark]"+"]>");
+		Tests.assertEquals(cdata, "Lightspark", "Only CDATA node in file");
+
+		try
+		{
+			var xml19:XML = new XML("<?xml version='1.0' encoding='UTF-8'?><root><node/><?xml version='1.0' encoding='UTF-8'?><node/></root>");
+		}
+		catch(e:Object)
+		{
+			Tests.assertDontReach("throws when XML declaration is not at the beginning");
+		}
+
+		var xml13:XML = new XML("<root><!-- comment --><?instruction ?>text<a><c/></a><a/><b/></root>");
+		Tests.assertEquals(3, xml13.elements().length(), "elements (no parameter)");
+		Tests.assertEquals(2, xml13.elements("a").length(), "elements with name");
+
+		var xml14:XML = new XML("<a>\n\t<child1/>\n\t</a>");
+		Tests.assertEquals(1, xml14.children().length(), "XML handling of white spaces")
+		Tests.assertEquals(true, xml14.hasOwnProperty('child1'), "XML handling of hasOwnProperty");
+
+		var xml15:XML = new XML("<test/>");
+		xml15.appendChild(5);
+		var xmllist4:XMLList = xml15.children();
+		Tests.assertEquals(1, xmllist4.length(), "appendChild with integer argument");
+		Tests.assertEquals("text", xmllist4[0].nodeKind(), "nodeKind with XML from integer");
+
+		var xml16:XML = new XML("<a>text1<b/>text2</a>");
+		var xmllist3:XMLList = xml16.children();
+		Tests.assertEquals(3, xmllist3.length(), "Number of children with text");
+		Tests.assertEquals("text1", xmllist3[0].toXMLString(), "First child");
+		Tests.assertEquals("<b/>", xmllist3[1].toXMLString(), "Second child");
+		Tests.assertEquals("text2", xmllist3[2].toXMLString(), "Third child");
+
+		var xml17:XML = new XML(5);
+		Tests.assertEquals("text", xml17.nodeKind(), "XML from integer");
+
+		var xml20:XML = new XML("<a/>");
+		var xmllist5:XMLList = new XMLList();
+		xmllist5[0] = new XML("<b/>");
+		xml20.appendChild(xmllist5);
+		Tests.assertEquals("<a>\n  <b/>\n</a>", xml20.toXMLString(), "appendChild with XMLList argument");
+		Tests.assertEquals("<a>\n  <b/>\n</a>", xml20.toString(), "XML.toString");
+		Tests.assertEquals("<a>\n  <b/>\n</a>", String(xml20), "String() on XML object");
+
+		var xml21:XML = new XML("<a/>");
+		Tests.assertEquals("a", xml21.name(), "::name() before setting [\"name\"]");
+		xml21["name"] = "bar";
+		Tests.assertEquals("a", xml21.name(), "::name() after setting [\"name\"]");
+		Tests.assertEquals("<a>\n  <name>bar</name>\n</a>", xml21.toString(), "::toString after setting name");
+
+		// According to the documentation this should throw
+		// TypeError but testing shows it doesn't
+		var exception:String = "";
+		try {
+			var xml22:XML = new XML(new Sprite());
+		} catch (err:Object) {
+			exception = err.toString();
+		}
+		Tests.assertEquals("", exception, "No exception when constructor is applied to a general object");
+
+		var xml23:XML = new XML("<a/>");
+		xml23["@fooattr"] = "bar";
+		Tests.assertEquals("<a fooattr=\"bar\"/>",xml23.toXMLString(),"Setting attributes using @name syntax");
+
+		Tests.report(visual, this.name);
+	}
+	]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

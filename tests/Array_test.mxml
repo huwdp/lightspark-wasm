@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_Array_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	import Tests;
+
+	private function multiply3(item:*, index:int, array:Array):void {
+		array[index] = item * 3;
+	}
+
+	private function appComplete():void
+	{
+		var array:Array = new Array();
+		Tests.assertArrayEquals([], array, "Array(): no-argument constructor, 0 elements", true);
+		array.push("test1");
+		Tests.assertArrayEquals(["test1"], array, "push(): first element", true);
+		array.push(2.5);
+		Tests.assertArrayEquals(["test1", 2.5], array, "push(): second element", true);
+		array.push("test3");
+		Tests.assertArrayEquals(["test1", 2.5, "test3"], array, "push(): third element", true);
+		array["normalMember"]="foo";
+	
+		var names:Array = new Array();
+		for(var name:String in array)
+		{
+			names.push(name);
+		}
+		Tests.assertArrayEquals(["0", "1", "2", "normalMember"], names, "'in' keyword", true);
+		
+		var a:Array=[76, 12, "3" ];
+
+		a.sort();
+		Tests.assertArrayEquals(a, new Array(12, "3", 76), "sort(): normal sort", true);
+
+		a.sort(Array.NUMERIC);
+		Tests.assertArrayEquals(a, new Array("3", 12, 76), "sort(): numeric sort", true);
+
+		var b:Array=[ 1, 2, 3 ];
+		b.forEach(multiply3);
+		Tests.assertArrayEquals(b, new Array(3, 6, 9), "forEach()");
+
+		var c:Array=[ 1, 2, 3 ];
+		var c2:Array=c.reverse();
+		Tests.assertArrayEquals(c, new Array(3, 2, 1), "reverse()");
+		Tests.assertTrue(c == c2, "reverse() return value");
+
+		var d:Array=[ 2, 1, 2, 3 ];
+		Tests.assertEquals(d.indexOf(2), 0, "indexOf() single parameter");
+		Tests.assertEquals(d.indexOf(2, 1), 2, "indexOf() two parameters");
+
+		var e:Array=[ 2, 1, 2, 3 ];
+		Tests.assertEquals(e.lastIndexOf(2), 2, "lastIndexOf() no offset");
+		Tests.assertEquals(e.lastIndexOf(2,2), 2, "lastIndexOf() no offset");
+		Tests.assertEquals(e.lastIndexOf(2, 1), 0, "lastIndexOf() positive offset");
+		Tests.assertEquals(e.lastIndexOf(2, -3), 0, "lastIndexOf() negative offset (1)");
+		Tests.assertEquals(e.lastIndexOf(2, -2), 2, "lastIndexOf() negative offset (2)");
+		Tests.assertEquals(e.lastIndexOf(2, NaN), 0, "lastIndexOf() NaN offset");
+		Tests.assertEquals(e.lastIndexOf(2, undefined), 0, "lastIndexOf() undefined offset");
+		Tests.assertEquals(e.lastIndexOf(2, "a"), 0, "lastIndexOf() string offset (1)");
+		Tests.assertEquals(e.lastIndexOf(2, "1"), 0, "lastIndexOf() string offset (2)");
+		Tests.assertEquals(e.lastIndexOf(2, 20), 2, "lastIndexOf() too big");
+
+		var f:Array=[ 2, 3, 4, 5];
+		var g:Array=f.splice(1,1000);
+		Tests.assertArrayEquals(f, [ 2 ], "splice with huge deleteCount: original array");
+		Tests.assertArrayEquals(g, [ 3, 4, 5], "splice with huge deleteCount: returned array");
+
+		var f2:Array=[ 2, 3, 4, 5];
+		var g2:Array=f2.splice(-1,1000);
+		Tests.assertArrayEquals(f2, [ 2, 3, 4], "splice with huge deleteCount and -1 as start index: original array");
+		Tests.assertArrayEquals(g2, [ 5 ], "splice with huge deleteCount and -1 as start index: returned array");
+
+		var f3:Array=[ 2, 3, 4, 5];
+		var g3:Array=f3.splice(6,1000);
+		Tests.assertArrayEquals(f3, [ 2, 3, 4, 5 ], "splice with huge deleteCount and huge startIndex: original array");
+		Tests.assertArrayEquals(g3, [ ], "splice with huge deleteCount and huge startIndex: returned array");
+
+		var f4:Array=[ 2, 3, 4, 5];
+		var g4:Array=f4.splice(-6,1000);
+		Tests.assertArrayEquals(f4, [ ], "splice with huge deleteCount and huge negative startIndex: original array");
+		Tests.assertArrayEquals(g4, [ 2, 3, 4, 5], "splice with huge deleteCount and huge negative startIndex: returned array");
+
+		var h:Array=[2, 3, 4, 5];
+		Tests.assertArrayEquals(h.slice(1), [3, 4, 5], "slice with one argument");
+		Tests.assertArrayEquals(h.slice(-2), [4, 5], "slice with negative start index");
+		Tests.assertArrayEquals(h.slice(1000), [], "slice with huge start index");
+		Tests.assertArrayEquals(h.slice(-1000), [2, 3, 4, 5], "slice with huge negative start index");
+		Tests.assertArrayEquals(h.slice(1, 3), [3, 4], "slice with two arguments");
+		Tests.assertArrayEquals(h.slice(1, -1), [3, 4], "slice with positive start index and negative end index");
+		Tests.assertArrayEquals(h.slice(1, -1000), [], "slice with small start index and huge end index");
+
+		function isNumeric(element:*, index:int, arr:Array):Boolean {
+			return (element is Number);
+		}
+
+		var i1:Array=[1, 2, 3];
+		var i2:Array=["x", 2, 3];
+		Tests.assertEquals(i1.every(isNumeric), true, "every on int array with callback checking if value is numeric");
+		Tests.assertEquals(i2.every(isNumeric), false, "every on mixed type array with callback checking if value is numeric");
+
+		var i3:Array=["x", "y", "z"];
+		var i4:Array=["x", "y", 3];
+		Tests.assertEquals(i3.some(isNumeric), false, "some on character array with callback checking if value is numeric");
+		Tests.assertEquals(i4.some(isNumeric), true, "some on mixed type array with callback checking if value is numeric");
+
+		Tests.assertEquals(i3.toString(), "x,y,z", "toString()");
+		Tests.assertEquals(i3.toLocaleString(), "[object String],[object String],[object String]", "toLocaleString()");
+		Tests.assertEquals(false,(["a","b",3] == ["a","b",3]),"Arrays not equals -> different objects");
+		Tests.assertEquals(false,(["a","b",3] === ["a","b",3]),"Arrays not equals -> different objects");
+
+		var j:Array = new Array();
+		j[-1] = "x";
+		j[7.4] = "y";
+		Tests.assertEquals("x",j[-1],"Array[-1]");
+		Tests.assertEquals("y",j[7.4],"Array[7.4]");
+		Tests.assertEquals("",j,"Associative elements do not appear in array");
+
+		Tests.report(visual, this.name);
+	}
+	]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

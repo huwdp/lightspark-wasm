@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_Function_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	import Tests;
+
+	private function appComplete():void
+	{
+		var testFunc:Function=function():void
+		{
+			this.validMember=true;
+		};
+		testFunc.prototype=new Object;
+		testFunc.prototype["superMember"]=true;
+		var testFunc2:Function=function():void
+		{
+			this.validMember2=true;
+		}
+		testFunc2.prototype=new testFunc;
+
+		Tests.assertEquals(true, testFunc is Function, "Dynamic function is Function");
+		Tests.assertEquals(testFunc, testFunc as Function, "Dynamic function as Function");
+		var constructed:Object=new testFunc();
+		Tests.assertEquals(false, constructed is Function, "Object constructed from function is not Function");
+		Tests.assertEquals(true, constructed["validMember"], "Object constructed from function members are valid");
+		Tests.assertEquals(true, constructed["superMember"], "Object constructed from function members may access function members");
+
+		var constructed2:Object=new testFunc2();
+		Tests.assertEquals(true,constructed2["validMember2"], "Function based inheritance [1/3]");
+		Tests.assertEquals(true,constructed2["validMember"], "Function based inheritance [2/3]");
+		Tests.assertEquals(true,constructed2["superMember"], "Function based inheritance [3/3]");
+		Tests.assertTrue(constructed2 instanceof testFunc2, "instanceof with base class");
+		Tests.assertTrue(constructed2 instanceof testFunc, "instanceof with super class");
+		testFunc2.prototype=null;
+		Tests.assertFalse(constructed2 instanceof testFunc2, "instanceof with base class, after changing prototype");
+
+		Tests.assertNull(constructed.prototype, "Objects from Function have no implicit prototype");
+
+		Tests.assertFalse(null instanceof testFunc, "instanceof with null object");
+
+		var instance1:FunctionEqualityTest = new FunctionEqualityTest();
+		var instance2:FunctionEqualityTest = new FunctionEqualityTest();
+		Tests.assertTrue(instance1.testFunction == instance1.testFunction, "Function equality, same scope");
+		Tests.assertFalse(instance1.testFunction == instance2.testFunction, "Function equality, different scope");
+
+		Tests.report(visual, this.name);
+	}
+	]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

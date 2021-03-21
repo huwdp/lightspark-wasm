@@ -1,0 +1,143 @@
+#!/bin/bash
+echo "Tip: you can rebuild individual tests by calling this script like"
+echo "./make-tamarin ecma3/Boolean/e15_6_4_3_2.as"
+echo "or ./make-tamarin ecma3/Boolean"
+
+TAMARIN=${TAMARIN:-avmplus}
+ASC=${ASC:-${TAMARIN}/utils/asc.jar}
+AVM=${AVM:-${TAMARIN}/objdir/shell/avmshell}
+if [[ ! -d $TAMARIN ]]; then
+  echo "tamarin test suite not found, please execute the following steps:"
+  echo "1) clone the avmplus repository: git clone https://github.com/adobe/avmplus.git"
+  echo "2) download the apache flex sdk from http://flex.apache.org/download-binaries.html"
+  echo "3) copy <flex-path>/lib/asc.jar to <avmplus.git>/utils"
+  echo "4) edit <avmplus.git>/core/exec.cpp and replace line 809 'return unreachableAtom;' with 'return 0;"
+  echo "5) mkdir <avmplus.git>/objdir && cd <avmplus.git>/objdir"
+  echo "6) python ../configure.py (tamarin neeeds python2, so make sure that python points to a python2 executable)"
+  echo "7) remove the -Werror flag from APP_CXXFLAGS in generated Makefile"
+  echo "8) add -Wno-narrowing to APP_CXXFLAGS in generated Makefile"
+  echo "8) make"
+  
+  echo "set the TAMARIN environment variable to the path of the cloned avmplus repository"
+  exit 1
+fi
+if [[ ! -f $ASC ]]; then
+  echo "File asc.jar not found, please download the apache flex sdk from http://flex.apache.org/download-binaries.html"
+  echo "and set ASC environment variable to '<flex-path>/lib/asc.jar' "
+  exit 1
+fi
+
+if [[ `java -jar $ASC | sed -n -e 's/version [^ ]* build \(.*\)/\1/p'` -lt 18513 ]]; then
+  echo "File asc.jar is too old, please download the apache flex sdk from http://flex.apache.org/download-binaries.html"
+  echo "and set ASC environment variable to '<flex-path>/lib/asc.jar' "
+  exit 1
+fi
+
+export CUR=`pwd`
+
+printCompileErrorAndExit()
+{
+    echo "Compiling tests failed."
+    exit 1;
+}
+
+# compile tests from Tamarin before commit 7555
+makeTamarin1()
+{
+    (cd $TAMARIN/test/acceptance && \
+    rm -f ats_temp.abc ats_temp.as shell.as && \
+    grep USES_SWFVERSION . -R --files-with-matches | xargs --no-run-if-empty rm && \
+    echo "override| -optimize -in $CUR/tamarin-lightspark.as -AS3 -swf 200,200 -in ./ats_temp.as" > dir.asc_args && \
+    ./runtests.py --asc $ASC --builtinabc ../../generated/builtin.abc --shellabc ../../generated/shell_toplevel.abc --ats --atsdir $CUR/tamarin-SWF $1) \
+    || printCompileErrorAndExit;
+}
+
+# compile tests from Tamarin commit 7555 and later
+makeTamarin2()
+{
+    if [[ ! -f $AVM ]]; then
+        echo "Set shell variable AVM to point to avmshell executable"
+        exit 1
+    fi
+
+    java -jar $ASC -import $TAMARIN/generated/builtin.abc quit.as
+
+    cd $TAMARIN/test/acceptance
+    compiled=$(./runtests.py --asc $ASC --avm $AVM --builtinabc ../../generated/builtin.abc --shellabc ../../generated/shell_toplevel.abc --rebuildtests $1)
+    if [[ $? -ne 0 ]]; then
+        printCompileErrorAndExit;
+    fi
+
+    # The first sed selects lines starting with "compiling" unless the
+    # following lines starts with "Excluding".
+    #
+    # The second sed filters out some strange cases (TODO: check
+    # these!).
+    echo "$compiled" | \
+        sed -n '/^compiling/{N; /\nExcluding/ b excluded; P; D; b; :excluded d}' | \
+        sed -n '/ascompiling\|mmgc\/outofmemory\.as\|mmgc\/memlimit\.as\|bug_515935.as\|abc_$/!p' | \
+        sed -e 's/compiling \(.*\)/\1/' \
+            -e 's/\(.*\.\)[a-z]\+$/\1abc/' | \
+        xargs -L 1 bash -c 'linkTamarinTest $0'
+    cd -
+}
+
+# Sort classes in $TEST_SUPPORT in dependecy order: put interface
+# classes first and sort other classes alphabetically.
+function sortSupportClasses() {
+    local interfaces=$(echo "$TEST_SUPPORT" | tr " " "\n" | grep Interface)
+    local classes=$(echo "$TEST_SUPPORT" | tr " " "\n" | grep -v Interface | sort)
+    TEST_SUPPORT=$(echo "$interfaces $classes" | tr "\n" " ")
+}
+
+# Create a .swf for a Tamarin test case by figuring out which .abc
+# files belong to the test case and merging them.
+# Input: the name of test case's main .abc or .abs file
+function linkTamarinTest() {
+    shouldExcludeTest "$1"
+    local exclude_test=$?
+
+    if [[ -f "$1" && "$exclude_test" -eq 0 ]]; then
+        echo "Linking $1"
+
+        mkdir -p $CUR/tamarin-SWF/$(dirname $1)
+        OUTPUT_SWF="$CUR/tamarin-SWF/${1/%ab[cs]/swf}"
+
+        COMMON="Assert.abc Utils.abc $TAMARIN/test/acceptance/generated/intrinsics.abc"
+        ABS_SUPPORT=$(if [[ -f ${1/%abc/abs} ]]; then echo abcasm/abs_helper.abc; fi)
+        TEST_SUPPORT=$(if [[ -d ${1/%.abc/} ]]; then echo $(ls ${1/%.abc/}/*.abc 2> /dev/null); fi)
+        sortSupportClasses
+        ABC_FILES="$COMMON $TEST_SUPPORT $ABS_SUPPORT $1 $CUR/quit.abc"
+
+        $CUR/../tools/mergeABCtoSWF $ABC_FILES -o $OUTPUT_SWF
+    elif [[ "$exclude_test" -ne 0 ]]; then
+	echo "Excluding $1"
+    fi
+}
+
+# Exclude testcases that need imports from shell_toplevel (avmplus,
+# avmshell packages) until versioned identifiers are supported.
+function shouldExcludeTest() {
+#    local asfile=${1/ab[cs]/as}
+#    grep --quiet --no-messages "import avmplus\|import avmshell" "$asfile"
+#    if [[ $? -eq 0 ]]; then
+#	return 1
+#    else
+	return 0
+#    fi
+}
+
+export -f linkTamarinTest sortSupportClasses shouldExcludeTest
+
+if [[ "x$1" = "x" ]]; then
+    rm -rf tamarin-SWF/*
+fi
+
+# Tamarin testing framework changed in commit 7555 in a way that is
+# incompatible with previous version of this script. Use Assert.as, a
+# file introduced in that commit, to detect the new test setup.
+if [[ -f $TAMARIN/test/acceptance/Assert.as ]]; then
+    makeTamarin2 $1;
+else
+    makeTamarin1 $1;
+fi

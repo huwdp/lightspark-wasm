@@ -1,0 +1,33 @@
+{
+global:
+	extern "C++" {
+		lightspark::*;
+		Log::*;
+		*zlib_file_filter*;
+		*zlib_filter*;
+		*sync_stream*;
+		*lightspark::Class_base*;
+		*lightspark::Event*;
+		*lightspark::Downloader*;
+		*lightspark::DownloadManager*;
+		*lightspark::StandaloneDownloadManager*;
+		*lightspark::ExtVariant*;
+		*lightspark::ExtIdentifier*;
+		*lightspark::ExtObject*;
+		*lightspark::ExtCallback*;
+		*lightspark::ExtASCallback*;
+		*lightspark::ExtBuiltinCallback*;
+		*lightspark::ExtScriptObject*;
+		*lightspark::EngineData*;
+		rt;
+		sys;
+		pt;
+		NP_*;
+		*tiny_string*;
+	};
+local:
+	extern "C++" {
+		*std::*;
+	};
+	*;
+};

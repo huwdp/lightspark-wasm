@@ -1,0 +1,351 @@
+#!/usr/bin/python
+#This greps the source for SET_NAMESPACE, REGISTER_CLASS_NAME2,
+#sinit definition and the following ->set{Getter,Setter,Method}ByQName calls
+
+#It greps the documentation for all properties and methods
+#and distinquishes read-only from write-only and dual-access properties
+
+import sys
+import re
+from subprocess import *
+import os
+import pickle
+
+#These regexp are used for finding important pieces in the source
+sinit = re.compile('.*void\s*(\w*)::sinit\(.*')
+rconstructor = re.compile('[^/]*ASFUNCTIONBODY[\_ATOM]*\( *([^,]*), *\_constructor\)')
+#looks like builtin->registerBuiltin("Capabilities","flash.system",Class<Capabilities>::getRef(m_sys));
+rclass          = re.compile('.*builtin->registerBuiltin\( *"([^"]*)", *"([^"]*)", *Class<([^>]*)>::getRef\(m\_sys\)\)')
+rtemplateclass  = re.compile('.*builtin->registerBuiltin\( *"([^"]*)", *"([^"]*)", *_MR\(Template<([^>]*)>::getTemplate\(m\_sys\)\)\)')
+rinterfaceclass = re.compile('.*builtin->registerBuiltin\( *"([^"]*)", *"([^"]*)", *InterfaceClass<([^>]*)>::getRef\(m\_sys\)\)')
+rclassavm1      = re.compile('.*builtinavm1->registerBuiltin\( *"([^"]*)", *"([^"]*)", *Class<([^>]*)>::getRef\(m\_sys\)\)')
+#the line may start with anything but a comment character
+rget = re.compile('[^/]*->setDeclaredMethodByQName\( *"([^"]*)", *([^,]*),[^,]*,[^,]*,(\w\),)*([^,]*,)* *GETTER_METHOD, *([^ ]*)')
+rset = re.compile('[^/]*->setDeclaredMethodByQName\( *"([^"]*)", *([^,]*),[^,]*,[^,]*,(\w\),)*([^,]*,)* *SETTER_METHOD, *([^ ]*)')
+rmet = re.compile('[^/]*->setDeclaredMethodByQName\( *"([^"]*)", *([^,]*),[^,]*,[^,]*,(\w\),)*([^,]*,)* *NORMAL_METHOD, *([^ ]*)')
+rmet2 = re.compile('[^/]*->prototype->setVariable[Atom]*ByQName\( *"([^"]*)", *([^,]*),[^,]*,[^,]*,(\w\),)* *[A-Z]*\_TRAIT')
+rget2 = re.compile('.*REGISTER_GETTER\([^,]*, *(.*)\)')
+rset2 = re.compile('.*REGISTER_SETTER\([^,]*, *(.*)\)')
+rgetset2 = re.compile('.*REGISTER_GETTER_SETTER\([^,]*, *(.*)\)')
+rgetset3 = re.compile('.*REGISTER_GETTER_SETTER_RESULTTYPE\([^,]*, *(.*), *([^ ]*)\)')
+rgetsetstatic2 = re.compile('.*REGISTER_GETTER_SETTER_STATIC\([^,]*, *(.*)\)')
+#take c->setVariableAtomByQName(..) but not c->prototype->setVariableByQName(..)
+rconst = re.compile('[^/]*[^prtoye]->setVariable[Atom]*ByQName\( *"([^"]*)",.*[A-Z]*\_TRAIT');
+#looks like Event *IOErrorEvent::cloneImpl() const
+rclone = re.compile('[^/]* *\* *([^\:]*)\:\:cloneImpl\(\)')
+
+rcomment = re.compile('[ \t]*/')
+
+#looks like IDataInput::linkTraits(Class_base* c)
+linkTraits = re.compile('.*void\s*(\w*)::linkTraits\(.*')
+#looks like lookupAndLink(c,"bytesAvailable","flash.utils:IDataInput");
+lookupAndLink = re.compile('[^/]*lookupAndLink\(c,*"([^"]*)", *([^ ]*)')
+
+def getFullname(cls,name):
+	if cls != "":
+		return cls + "." + name
+	else:
+		return name
+
+if not os.path.exists("pygil"):
+	print("This script is stupid! Please got to the tools directory")
+	print("and run at from there by ./pygil")
+	exit(1)
+
+classes = set([])
+getters = set([])
+setters = set([])
+methods = set([])
+const = set([])
+stubclasses = set([])
+warnNotRegistered = set([])
+internalToExternal = {}
+curClass = ""
+curClassConstructor = ""
+
+#1. Step: parse scripting/abc.cpp to map the AS3 names to our class names
+for fname in [
+	'../src/scripting/abc.cpp',
+	'../src/scripting/abc_flashaccessibility.cpp',
+	'../src/scripting/abc_flashdesktop.cpp',
+	'../src/scripting/abc_flashconcurrent.cpp',
+	'../src/scripting/abc_flashcrypto.cpp',
+	'../src/scripting/abc_flashdisplay.cpp',
+	'../src/scripting/abc_flashdisplay3d.cpp',
+	'../src/scripting/abc_flashevents.cpp',
+	'../src/scripting/abc_flasherrors.cpp',
+	'../src/scripting/abc_flashexternal.cpp',
+	'../src/scripting/abc_flashfilesystem.cpp',
+	'../src/scripting/abc_flashfilters.cpp',
+	'../src/scripting/abc_flashgeom.cpp',
+	'../src/scripting/abc_flashglobalization.cpp',
+	'../src/scripting/abc_flashmedia.cpp',
+	'../src/scripting/abc_flashnet.cpp',
+	'../src/scripting/abc_flashprinting.cpp',
+	'../src/scripting/abc_flashsampler.cpp',
+	'../src/scripting/abc_flashsecurity.cpp',
+	'../src/scripting/abc_flashsensors.cpp',
+	'../src/scripting/abc_flashsystem.cpp',
+	'../src/scripting/abc_flashtext.cpp',
+	'../src/scripting/abc_flashui.cpp',
+	'../src/scripting/abc_flashutils.cpp',
+	'../src/scripting/abc_flashxml.cpp',
+	'../src/scripting/abc_avmplus.cpp',
+	'../src/scripting/abc_toplevel.cpp'
+	]:
+	f = open(fname,'r')
+	for line in f.read().replace("\n","").replace("\t"," ").split(";"):
+		m = rclass.match(line)
+		if m:
+			fullname = getFullname(m.group(2),m.group(1))
+			internalToExternal[m.group(3)] = fullname
+			classes.add(fullname)
+		m = rtemplateclass.match(line)
+		if m:
+			fullname = getFullname("",m.group(1))
+			internalToExternal[m.group(3)] = fullname
+			classes.add(fullname)
+		m = rinterfaceclass.match(line)
+		if m:
+			fullname = getFullname(m.group(2),m.group(1))
+			internalToExternal[m.group(3)] = fullname
+			classes.add(fullname)
+		m = rclassavm1.match(line)
+		if m:
+			fullname = getFullname(m.group(2),m.group(1))
+			internalToExternal[m.group(3)] = fullname
+	f.close()
+
+#print internalToExternal
+
+#2. Step: parse the rest of the source files for the implementation of 
+p1 = Popen(["find", "..", "-name",'*.cpp'], stdout=PIPE)
+#return p1.communicate()[0]
+#p2 = Popen(["xargs","grep","-h",
+#	    "-e","sinit",
+#	    "-e","set[a-zA-Z]*ByQName",
+#	    "-e","setConstructor"], stdin=p1.stdout, stdout=PIPE)
+p2 = Popen(["xargs","cat"], stdin=p1.stdout, stdout=PIPE);
+p1.stdout.close() 
+
+ptmp =""
+for line in p2.communicate()[0].decode("UTF-8","ignore").split("\n"):
+	m = rcomment.match(line)
+	if m:
+		continue
+	ptmp = ptmp + line
+	
+for line in ptmp.split(";"):
+	line = line.replace("\n","").rstrip().rstrip();
+	m = sinit.match(line)
+	if m:
+		curClass = m.group(1)
+		if curClass not in internalToExternal:
+			warnNotRegistered.add(curClass)
+		else:
+			curClass = internalToExternal[curClass]
+		curScope = curClass
+		continue
+	m = rconstructor.match(line)
+	if m:
+		#the constructor is named after the class
+		curClassConstructor = m.group(1)
+		if curClassConstructor not in internalToExternal:
+			warnNotRegistered.add(curClassConstructor)
+		else:
+			curClassConstructor = internalToExternal[curClassConstructor]
+		methods.add((curClassConstructor,curClassConstructor[curClassConstructor.rfind('.')+1:]))
+		continue
+	m = rget.match(line)
+	if m:
+		getters.add((curClass, m.group(1)))
+		continue
+	m = rget2.match(line)
+	if m:
+		getters.add((curClass, m.group(1)))
+		continue
+	m = rset.match(line)
+	if m:
+		setters.add((curClass, m.group(1)))
+		continue
+	m = rset2.match(line)
+	if m:
+		setters.add((curClass, m.group(1)))
+		continue
+	m = rgetset2.match(line)
+	if m:
+		getters.add((curClass, m.group(1)))
+		setters.add((curClass, m.group(1)))
+		continue
+	m = rgetset3.match(line)
+	if m:
+		getters.add((curClass, m.group(1)))
+		setters.add((curClass, m.group(1)))
+		continue
+	m = rgetsetstatic2.match(line)
+	if m:
+		getters.add((curClass, m.group(1)))
+		setters.add((curClass, m.group(1)))
+		continue
+	m = rmet.match(line)
+	if m:
+		methods.add((curClass, m.group(1)))
+		continue
+	m = rmet2.match(line)
+	if m:
+		methods.add((curClass, m.group(1)))
+		continue
+	m = rconst.match(line)
+	if m:
+		const.add((curClass,m.group(1)))
+		continue
+	m = rclone.match(line)
+	if m:
+		curClassClone = m.group(1)
+		if curClassClone not in internalToExternal:
+			warnNotRegistered.add(curClassClone)
+		else:
+			curClassClone = internalToExternal[curClassClone]
+		methods.add((curClassClone, 'clone'))
+		continue
+	m = linkTraits.match(line)
+	if m:
+		curClass = m.group(1)
+		if curClass not in internalToExternal:
+			warnNotRegistered.add(curClass)
+		else:
+			curClass = internalToExternal[curClass]
+		curScope = curClass
+		continue
+	m = lookupAndLink.match(line)
+	if m:
+		methods.add((curClass, m.group(1)))
+		continue
+	
+#print getters
+#print setters
+
+#3. Step: parse documenation for classes, properties and methods
+try:
+	dbFile = open("langref.db", 'rb')
+	(version, dclasses, dproperties, dmethods) = pickle.load( dbFile )
+	dbFile.close()
+except IOError:
+	print ("Error opening langref.db. Have you run langref_parser in this directory?")
+	exit(1)
+
+dconst = set([])
+dgetters = set([])
+dsetters = set([])
+mclasses = set([])
+for (curClass,name,isConst,isStatic,isReadOnly,isWriteOnly,isOverride) in dproperties:
+	if isConst:
+		dconst.add((curClass,name))
+		continue
+	if not isReadOnly:
+		dsetters.add((curClass,name))
+	if not isWriteOnly:
+		dgetters.add((curClass,name))
+
+for cls in dclasses:
+	if cls not in classes:
+		mclasses.add(cls)
+
+mgetters = []
+msetters = []
+mmethods = []
+pmclasses = set([])
+missing = []
+fclasses = set([])
+
+for (cls,name) in dgetters:
+	if cls in mclasses:
+		continue #do not list member of missing classes
+	fullName = getFullname(cls,name)
+	if (cls,name) not in getters:
+		if (cls,name) in dsetters and (cls,name) not in setters:
+			missing.append(fullName + " (getter/setter)")
+		else:
+			missing.append(fullName + " (getter)")
+		pmclasses.add(cls)
+		#mgetters.append(i)
+		#print "\t" +i
+
+for (cls,name) in dsetters:
+	if cls in mclasses:
+		continue #do not list member of missing classes
+	fullName = getFullname(cls,name)
+	if (cls,name) not in setters:
+		if (cls,name) in dgetters and (cls,name) not in getters:
+			pass #handled abovec
+		else:
+			missing.append(fullName + " (setter)")
+		pmclasses.add(cls)
+		#msetters.append(i)
+		#print "\t" + i
+
+for (cls,name) in dmethods:
+	if cls in mclasses:
+		continue #do not list member of missing classes
+	fullName = getFullname(cls,name)
+	if (cls,name) not in methods:
+		missing.append(fullName + " (method)")
+		#mmethods.append(i)
+		#print "\t" + i
+		pmclasses.add(cls)
+
+for (cls,name) in dconst:
+	if cls in mclasses:
+		continue
+	fullName = getFullname(cls,name)
+	if (cls,name) not in const:
+		missing.append(fullName + " (constant)")
+		pmclasses.add(cls)
+
+#Fully implemented are classes which are in the reference
+#docs and not in missing classes or partly missing classes
+for i in dclasses:
+	if i not in mclasses and i not in pmclasses:
+		fclasses.add(i)
+
+print ("Fully implemented classes:")
+for i in sorted(fclasses):
+	print ("\t" + i)
+
+print ("\nFully Missing classes:")
+for i in sorted(mclasses):
+	print ("\t" + i)
+
+print ("\nMissing getters/setters/methods (in partially implemented classes):")
+for i in sorted(missing):
+	print ("\t" + i)
+
+print ("")
+
+#If a subclass overrides a method of its base, then it has an entry
+# (flash.*.subclass,overridenMethod)
+for (cls,name) in sorted(getters):
+	if (cls,name) not in dgetters:
+		print ("Warning: Implemented non-spec getter", getFullname(cls,name) )
+for (cls,name) in sorted(setters):
+	if (cls,name) not in dsetters:
+		print ("Warning: Implemented non-spec setter", getFullname(cls,name) )
+for (cls,name) in sorted(methods):
+	if (cls,name) not in dmethods:
+		print ("Warning: Implemented non-spec method", getFullname(cls,name) )
+print ("")
+for i in warnNotRegistered:
+	print ("Warning: " + i + " is not registered in scripting/abc.cpp")
+
+
+#print mmethods
+#print mclasses
+#print pmclasses
+print ("")
+print ("Number of fully implemented classes:                ", len(fclasses))
+print ("Number of implemented getters/setters/methods/const:", len(setters),len(getters),len(methods),len(const))
+print ("Total number of implemented                        :", len(setters)+len(getters)+len(methods)+len(const))
+print ("Number of missing classes                          :", len(mclasses))
+print ("Number of missing getters/setters/methods/consts:   ", (len(dsetters)-len(setters)), len(dgetters)-len(getters), len(dmethods)-len(methods), len(dconst)-len(const))
+print ("Total number of missing:                            ", (len(dsetters)+len(dgetters)+len(dmethods)+len(dconst)) - (len(setters)+len(getters)+len(methods)+len(const)))
+print ("Overall percentage completed:                       ", float(len(setters)+len(getters)+len(methods)+len(const))/float(len(dsetters)+len(dgetters)+len(dmethods)+len(dconst))*100)

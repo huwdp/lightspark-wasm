@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_text_TextField_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	import Tests;
+	import flash.text.*;
+	private function appComplete():void
+	{
+		var format:TextFormat = new TextFormat();
+		Tests.assertEquals(null, format.color, "TextFormat init null");
+		format.color = 0xFF00FF;
+		Tests.assertEquals(0xFF00FF, format.color, "TextFormat.color s/getter");
+
+		var field:TextField = new TextField();
+		Tests.assertEquals(0,field.textColor, "TextField init color");
+		field.setTextFormat(format);
+		Tests.assertEquals(null,field.getTextFormat().color, "TextField.setTextFormat does nothing without text");
+
+		field.text = "Hello";
+		field.setTextFormat(format);
+		Tests.assertEquals(0xFF00FF,field.getTextFormat().color, "TextField.setTextFormat does nothing without text");
+
+		format.color = null;
+		field.setTextFormat(format);
+		Tests.assertEquals(0xFF00FF,field.getTextFormat().color, "TextField.setTextFormat with null does not change");
+
+		Tests.assertEquals(0,field.textColor, "TextField.setTextFormat does not change TextField.textColor");
+
+		field = new TextField();
+		field.htmlText = "<font face='Arial' size='30' color='#123456'>aaa</font>";
+		Tests.assertEquals(0x123456, field.getTextFormat().color, "HTML formating: textColor");
+		Tests.assertEquals(30, field.getTextFormat().size, "HTML formating: font size");
+		Tests.assertEquals("Arial", field.getTextFormat().font, "HTML formating: font face");
+
+		Tests.report(visual, this.name);
+	}
+	]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

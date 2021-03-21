@@ -1,0 +1,345 @@
+lightspark: An open source flash player implementation
+
+Version NEXT:
+
+	* better support for embedded video
+	* lightspark now runs directly on wayland (with SDL_VIDEODRIVER=wayland)
+	* better support for obfuscated AVM1 files
+	* significantly faster rendering of bitmaps
+
+Version 0.8.4.1:
+
+	* Hotfix for crash on Windows, no changes for Linux
+
+Version 0.8.4:
+
+	* improved handling of mixed AVM1/AVM2 files
+	* implement streaming of videos embedded in the swf file
+	* implement class inheritance for AVM1
+	* added settings dialog, currently only used to enable/disable local storage
+	* support for local storage added
+	* use SDL threading methods, remove glibmm dependency
+
+Version 0.8.3:
+
+	* fix support for sound in PPAPI plugin
+	* better handling of obfuscated code
+	* new command line argument to ignore unhandled exceptions
+	* support for context menus added
+	* partial support for CubeTextures and compressed Textures in Stage3d
+	* ability to create screenshot added
+	* boost dependency removed
+	* fullscreen mode implemented
+	* better sound handling, especially for AVM1
+	* better support of older (AVM1) swf files
+	* support for xml in AVM1
+	* support for video streaming in AVM1
+
+Version 0.8.2:
+
+	* implement support for text input
+	* implement support for sound streaming (SoundStreamHead/SoundStreamHeadBlock tags)
+	* direct support for older swf, no need for gnash any more (fallback to gnash ist still available by setting environment variable LIGHTSPARK_USE_GNASH=1)
+	* PPAPI plugin works again
+	* make llvm dependency optional (disabled by default)
+	* implement flash.system.Worker/WorkerDomain
+	* use libswresample instead of libavresample, if available
+	* reduce memory usage
+	* several performance improvements
+	* add partial support for rtmfp protocol
+
+Version 0.8.1:
+
+	* make plugins work with newer versions of firefox and chromium
+	* partially implement flash.net.Socket
+	* several performance improvements, but lightspark is still slower than adobe player
+	* fix several rendering issues
+	* implement support for Stage3D
+	* partially implement MorphShape rendering
+	* add support for llvm 5.0
+	* remove gtk2 dependency
+	* fix Reference counting, significantly reduces memory usage
+
+Version 0.8:
+
+	* make NPAPI plugin windowless, now it works on Firefox > version 52
+	* add ppapi plugin for use with chromium based browsers
+	* switch to SDL2/SDL2_mixer for everything except Firefox plugin.
+	  - the plugin uses gtk2 to interact with Firefox, so the gtk2 dependency is only needed when building the Firefox plugin
+	  - removes audio plugins as audio is now handled via SDL2_mixer for all platforms.
+	  - removes the pulseaudio dependency
+	  - the configuration setting [audio] is no longer needed
+	* implement rendering of embedded fonts in TextFields
+	* fix handling of multiple streams in SDL audio plugin, adds dependency on sdl_mixer
+	* switch to internal xml parsing (based on pugixml), removes dependency on libxml++
+	* compilation using clang possible
+	* implement several missing opcodes
+	* fix serialization
+	* implement data generation mode
+	* support for avmplus classes (mostly stubs)
+	* Support LLVM up to version 4.0
+	* fix event dispatcher handling
+	* several fixes for object initialization
+	* partially implement AMF0 decoding
+	* complete rework of XML subsystem
+	* Support embedded audio
+	* Implement JSON parsing
+
+Version 0.7.2:
+
+	* Improved image support: alpha in palettes, abbreviated JPEGs
+	* Improved embedded font parsing and text positioning
+	* Open links in a browser (plugin only)
+	* BitmapData improvements
+	* Fixed many crashes
+
+Version 0.7.1:
+
+	* Fixes for YouTube
+	* Support keyboard press and release events
+	* Support mouse wheel events and other mouse event improvements
+	* Support LLVM 3.2
+	* Implemented hit testing of DisplayObjects
+	* Parse JPEG images embedded in DefineBits tags
+	* Parse RGB15 and paletted images in DefineBitsLossless tags
+	* Improved XML support
+
+Version 0.7.0:
+
+	* Support LZMA compressed SWFs [Requires liblzma]
+	* Improved BitmapData support
+	* Improved ActionScript compatibility
+	* Improved virtual machine performance and memory consumption
+	* Improved XML support
+	* Experimental support for bytecode optimization at runtime
+	* Improved ExternalInterface (browser integration) support
+	* Improved performance of JPEG loading
+	* Support for XMLSocket
+	* Completely redesigned and improved masking support
+
+Version 0.6.0:
+
+	* Enable RTMP support by default, requires librtmp
+	* Fixed support for IEventDispatcher implementation pattern
+	* Improved serialization robustness
+	* Improved matrix handling
+	* Implement string and namespace pooling to reduce memory consumption
+	* Proper support for private namespaces
+	* Improved support for fonts
+	* Support LLVM 3.1
+	* Fix full volume issue when PulseAudio flat volumes are enabled
+	* Initial support for AIR desktop applications
+	* Support for www.bbc.co.uk video player
+
+Version 0.5.7:
+
+	* Fixed a few memory leaks
+	* Improved support for BitmapData::draw
+	* Support for BitmapData::copyPixels
+	* Support for soft masking
+	* Support for memory usage profiling (massif compatible)
+
+Version 0.5.6:
+
+	* Fix YouTube support for several videos
+	* Support for custom serialization/deserialization
+	* Support RPC (NetConnection::call)
+	* Support for PNG images
+	* Experimental support for Google Street View
+
+Version 0.5.5:
+	
+	* Support Firefox 10
+	* Fixed mutiple bugs
+
+Version 0.5.4.1:
+
+	* Fix YouTube support
+	* Look for LLVM-3.0 when building
+
+Version 0.5.4:
+
+	* Fix build against LLVM-3.0
+	* Drop OpenAL backend
+	* ENABLE_RTMP=1 by default
+	* Many fixes for crashers and hangs
+	* API additions and fixes to XML, Vector, Matrix
+	* Code cleanups
+
+Version 0.5.3:
+	* Support playing RTMP streams from Flash Media Server when
+	  compiled with ENABLE_RTMP=1
+	* Fixed several memory leaks
+	* Ported Lightspark to windows, including a firefox plugin
+	* Fixed multiple hangs and crashes
+
+Version 0.5.2.1:
+	* Patch version to fix up reported version.
+
+Version 0.5.2:
+	* Requires llvm 2.8
+	* Added LIGHTSPARK_PLUGIN_PARAMFILE environment variable to let the
+	  plugin write parameter files that are compatible with lightsparks '-p'
+	  commandline switch
+	* Many bugfixes and changes to the VM that make many more  tests pass
+ 	* Reorganized code that implements the Flash and AS3 API into
+	  directories and files that more closely match the respective package
+	  and class hierarchies
+
+Version 0.5.1:
+	* Misc fixes to better support YouTube, Vimeo, Flowplayer
+	* VM correctness improvements
+	* Support for AS templates
+	* Dropped half-finished AVM1 support
+	* Support for EGL/GLES2 rendering
+	* Support for loading external JPEGs
+	* Better text handling(e.g. coloring)
+	* Improved test runner, support for the Tamarin testsuite
+	* Various API fixes for bugs uncovered by the testsuite
+	* Dropped mozilla dependency, use internal NPAPI headers
+	* Added LIGHTSPARK_PLUGIN_LOGLEVEL environment variable to control the log level of the browser
+
+Version 0.5.0:
+	* Improved XML support
+	* Improved FFMpeg based media playback
+	* Improved robustness
+	* Improved ExternalInterface (browser communication)
+	* Improved masking support
+	* Improved alpha support
+	* Support capture phase of the event flow
+	* Support SimpleButton
+	* Support audio volume
+	* Support for introspection of ActionScript objects (describeType)
+	* Support for AMF3 serialization
+	* Support plugin resize
+	* Support for dynamic text
+	* Remove SDL dependency from the core
+	* Removed Fontconfig and FTGL dependencies
+	* Added SDL based audio backend
+	* More GLES compliant
+	* Faster shader code
+
+Version 0.4.8
+	* Reduced memory usage on streaming videos
+	* Fixed a couple of refcounting bugs
+	* Improved robustness when parsing broken XML
+
+Version 0.4.8 RC1
+	* Experimental Vimeo support
+	* Cleaned up Shape support
+	* Improved Timer support
+	* Support for JPEG parsing
+	* Improved reference counting
+	* Support for static text
+	* MP4 support (FFMpeg based)
+
+Version 0.4.7.1
+	* Fix YouTube breakage
+
+Version 0.4.7
+	* Fix YouTube breakage
+	* More robustness against deadlocks
+	* Implement flash.net.URLVariables
+	* XML fixes
+	* Browser plugin is now built by default
+
+Version 0.4.6.1:
+	* Fix YouTube breakage
+
+Version 0.4.6:
+	* Fix YouTube breakage
+	* Vastly improved gradient support
+	* Fixed a large amount of graphics glitches
+	* Add support for upcoming Gnash release 0.8.9
+	* Add profiling support for ActionScript code
+	* Add support for muting all sounds using the 'm' key
+	* Add support for copying error messages using the 'c' key in plugin
+
+Version 0.4.5.3
+	* Fix YouTube breakage
+
+Version 0.4.5.2
+	* Fix YouTube breakage
+
+Version 0.4.5.1
+	* Fix YouTube breakage
+	* Add support for AMF3 parsing
+	* Experimental support for PowerPC Linux
+
+Version 0.4.5
+	* Added --version command line option
+
+Version 0.4.5 RC1:
+	* Use Advanced Graphics Engine
+	* Masking and clipping support
+
+Version 0.4.4.3:
+	* Add support for cross-domain policy files
+
+Version 0.4.4.2:
+	* Pluginized architecture for audio backends
+
+Version 0.4.4.1:
+	* Disk based caching for downloads
+	* Fixes a crash when using flashblock
+
+Version 0.4.4:
+	* Localization support
+	* Exception handling support
+	* More robust network handling
+	* Stream controls (Play/Pause)
+
+Version 0.4.3:
+	* Liquid layout support
+	* Several small bug fixes
+
+Version 0.4.3 RC1:
+	* Faster rendering of the input layer
+	* Reduced memory consumption
+	* Support for H263/MP3 videos
+	* Smoother playback of audio and video
+
+Version 0.4.2.3:
+	* Bugfix release
+
+Version 0.4.2.2:
+	* Fallback on Gnash for older clips
+
+Version 0.4.2.1:
+	* Small bugfix
+
+Version 0.4.2:
+	* Use fontconfig to select fonts
+	* Nore efficient handling of read only strings
+	* Greater compatibility with youtube videos
+	* Better compatibility with radeon cards
+	* Sound synchronization
+	* Chrome/Chromium support
+	* Firefox's OOPP support
+
+Version 0.4.1:
+	* Optimized rendering of simple graphics
+	* First youtube support
+
+Version 0.4.0 RC3:
+	* Also use NPOT if available
+
+Version 0.4.0 RC2:
+	* Better support for older intel cards
+
+Version 0.4.0 RC1:
+	* Better stability, the plugin should not crash
+	* Use Power-Of-Two sized textures for better compatibility
+
+Version 0.3.9:
+	* More complete cleanup of GL resources
+
+Version 0.3.8:
+	* Solved deadlock issues when using FlashBlock
+
+Version 0.3.7:
+	* Improved stability and relaxed graphics requirements
+
+Version 0.3.6:
+	* Be more careful about glew initialization
+

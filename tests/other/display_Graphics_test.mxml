@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_DISPLAY_GRAPHICS_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	private function appComplete():void
+	{
+		var matrix:Matrix=new Matrix();
+		matrix.a=2000.0/16384.0;
+		matrix.d=2000.0/16384.0;
+
+		s1.graphics.beginGradientFill("linear",[0x000000,0x008800],[1,1],[0,255],matrix);
+		s1.graphics.drawRect(0,0,200,100);
+		s1.graphics.endFill();
+
+		s1.graphics.beginFill(0x008800,1);
+		s1.graphics.drawRect(0,105,200,100);
+		s1.graphics.endFill();
+
+		s2.x=70;
+		s2.y=50;
+		s2.graphics.beginGradientFill("linear",[0,0,0],[0,0,1],[0,128,255]);
+		s2.graphics.drawRect(0,0,100,100);
+		s2.graphics.endFill();
+		s1.cacheAsBitmap=true;
+		s2.cacheAsBitmap=true;
+		s1.mask=s2;
+
+		s3.graphics.beginGradientFill("linear",[0x000000,0x008800],[1,1],[0,255],matrix);
+		s3.graphics.drawRect(300,0,200,100);
+		s3.graphics.endFill();
+
+		s3.graphics.beginFill(0x008800,1);
+		s3.graphics.drawRect(300,105,200,100);
+		s3.graphics.endFill();
+
+		s4.x=320;
+		s4.y=50;
+		s4.graphics.beginGradientFill("linear",[0,0,0],[0,0,1],[0,128,255]);
+		s4.graphics.drawRect(0,0,100,100);
+		s4.graphics.endFill();
+		s3.mask=s4;
+	}
+	]]>
+</mx:Script>
+
+<mx:UIComponent id="s1" />
+<mx:UIComponent id="s2" />
+<mx:UIComponent id="s3" />
+<mx:UIComponent id="s4" />
+
+</mx:Application>

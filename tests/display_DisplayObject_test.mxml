@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_display_DisplayObject_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+<![CDATA[
+import flash.display.Sprite;
+import flash.geom.Point;
+import flash.display.DisplayObject;
+import Tests;
+
+private function appComplete():void
+{
+	var square:Sprite = new Sprite();
+	square.graphics.beginFill(0xFFCC00);
+	square.graphics.drawRect(0, 0, 100, 100);
+	square.x = 100;
+	square.y = 200;
+
+	stage.addChild(square);
+	var clickPoint:Point = new Point(square.x, square.y);
+
+	Tests.assertEquals(square.localToGlobal(clickPoint).x, 200, "localToGlobal()");
+	Tests.assertEquals(square.localToGlobal(clickPoint).y, 400, "localToGlobal()");
+
+	var sprite1:Sprite = new Sprite();
+	sprite1.graphics.drawRect(0, 0, 100, 100);
+	var sprite2:Sprite = new Sprite();
+	sprite2.graphics.drawRect(0, 0, 100, 100);
+	sprite2.x = 100;
+	var sprite3:Sprite = new Sprite();
+	sprite3.graphics.drawRect(0, 0, 100, 100);
+	sprite3.x = 100;
+	sprite1.addChild(sprite2);
+	sprite2.addChild(sprite3);
+	var sprite4:Sprite = new Sprite();
+	sprite4.graphics.drawRect(0, 0, 100, 100);
+	sprite4.x=150;
+
+	Tests.assertEquals(0, sprite3.getBounds(sprite3).x, "getBounds against itself");
+	Tests.assertEquals(100, sprite3.getBounds(sprite2).x, "getBounds against parent");
+	Tests.assertEquals(200, sprite3.getBounds(sprite1).x, "getBounds against parent of parent");
+	Tests.assertEquals(50, sprite3.getBounds(sprite4).x, "getBounds against unrelated");
+	sprite4.scaleX=0;
+	Tests.assertEquals(200, sprite3.getBounds(sprite4).x, "getBounds against collapsed unrelated");
+
+	var sprite5:Sprite = new Sprite();
+	sprite5.graphics.drawRect(0, 0, 100, 100);
+	sprite5.rotation = 90;
+	stage.addChild(sprite5);
+
+	Tests.assertEquals(-100, sprite5.getBounds(stage).x, "getBounds with rotation (X)");
+	Tests.assertEquals(0, sprite5.getBounds(stage).y, "getBounds with rotation (Y)");
+	Tests.assertEquals(100, sprite5.getBounds(stage).width, "getBounds with rotation (Width)");
+	Tests.assertEquals(100, sprite5.getBounds(stage).height, "getBounds with rotation (Height)");
+
+	var sprite6:Sprite = new Sprite();
+	var sprite7:Sprite = new Sprite();
+	sprite6.scaleX = 0.5;
+	sprite7.scaleX = 0.5;
+	sprite7.graphics.drawRect(0, 0, 100, 100);
+	sprite6.addChild(sprite7);
+
+	Tests.assertEquals(50, sprite7.width, "Width on child");
+	Tests.assertEquals(25, sprite6.width, "Width on parent");
+
+	Tests.assertNotNull(visual.stage, "Stage not null");
+
+	Tests.report(visual, name);
+}
+]]>
+</mx:Script>
+
+<mx:UIComponent id="visual" />
+
+</mx:Application>

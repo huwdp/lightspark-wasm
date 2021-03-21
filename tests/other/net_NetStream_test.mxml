@@ -1,0 +1,228 @@
+<?xml version="1.0"?>
+<mx:Application name="lightspark_net_NetStream_test"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	applicationComplete="appComplete();"
+	backgroundColor="white">
+
+<mx:Script>
+	<![CDATA[
+	private var video:Video;
+	private var stream_ns:NetStream;
+	//This is the URL for HTTP pseudo-streaming. A sourceforge hardlink should be placed here later.
+	private var netVideoURL:String = "http://lightspark.sourceforge.net/bigbuckbunny.flv";
+	//This is the path for a local file. 
+	//This file will be selected if you run lightspark with the "-s local-with-filesystem" runtime switch.
+	private var localVideoPath:String = "bigbuckbunny.flv";
+	private var paused:Boolean = false;
+
+	private var metadata:Object;
+	private var maxVideoHeight:uint = 240;
+	private function appComplete():void
+	{
+		playRect.graphics.beginFill(0x80ff60);
+		playRect.graphics.moveTo(20, 250);
+		playRect.graphics.lineTo(60, 275);
+		playRect.graphics.lineTo(20, 300);
+		playRect.graphics.lineTo(20, 250);
+		playRect.graphics.endFill();
+
+		pauseRect.graphics.beginFill(0xff8060);
+		pauseRect.graphics.drawRect(70,250,20,50);
+		pauseRect.graphics.endFill();
+		pauseRect.graphics.beginFill(0xffffff);
+		pauseRect.graphics.drawRect(91,250,8,50);
+		pauseRect.graphics.endFill();
+		pauseRect.graphics.beginFill(0xff8060);
+		pauseRect.graphics.drawRect(100,250,20,50);
+		pauseRect.graphics.endFill();
+
+		stopRect.graphics.beginFill(0x8060ff);
+		stopRect.graphics.drawRect(130,250,50,50);
+		stopRect.graphics.endFill();
+
+		seekRect.graphics.beginFill(0x0080ff);
+		seekRect.graphics.moveTo(190, 250);
+		seekRect.graphics.lineTo(210, 275);
+		seekRect.graphics.lineTo(190, 300);
+		seekRect.graphics.lineTo(190, 250);
+		seekRect.graphics.moveTo(215, 250);
+		seekRect.graphics.lineTo(235, 275);
+		seekRect.graphics.lineTo(215, 300);
+		seekRect.graphics.lineTo(215, 250);
+		seekRect.graphics.endFill();
+
+		progressBorderRect.graphics.beginFill(0x000000);
+		progressBorderRect.graphics.moveTo(18,318);
+		progressBorderRect.graphics.lineTo(472,318);
+		progressBorderRect.graphics.lineTo(472,337);
+		progressBorderRect.graphics.lineTo(18,337);
+		progressBorderRect.graphics.lineTo(18,319);
+		progressBorderRect.graphics.endFill();
+
+		downloadProgressBorderRect.graphics.beginFill(0x000000);
+		downloadProgressBorderRect.graphics.moveTo(18,338);
+		downloadProgressBorderRect.graphics.lineTo(472,338);
+		downloadProgressBorderRect.graphics.lineTo(472,357);
+		downloadProgressBorderRect.graphics.lineTo(18,357);
+		downloadProgressBorderRect.graphics.lineTo(18,339);
+		downloadProgressBorderRect.graphics.endFill();
+		
+		playRect.addEventListener(MouseEvent.CLICK,playClick);
+		pauseRect.addEventListener(MouseEvent.CLICK,pauseClick);
+		stopRect.addEventListener(MouseEvent.CLICK,stopClick);
+		seekRect.addEventListener(MouseEvent.CLICK,seekClick);
+
+
+		//Created from instructions on:
+		//http://www.adobe.com/devnet/flashplayer/articles/hd_video_flash_player_03.html
+
+		var connect_nc:NetConnection = new NetConnection();
+		if(Security.sandboxType == Security.REMOTE || 
+			Security.sandboxType == Security.LOCAL_WITH_NETWORK) 
+		{
+			trace("Running in remote sandbox: using HTTP pseudo-streaming");
+		}
+		else if(Security.sandboxType == Security.LOCAL_TRUSTED)
+		{
+			trace("Running in local-trusted sandbox: using local file");
+		}
+		else
+		{
+			trace("Running in local-with-filesystem sandbox: NetConnection.connect not allowed. This test should fail.");
+		}
+		try
+		{
+			connect_nc.connect(null); //Undefined = HTTP pseudo-streaming
+		}
+		catch(e:SecurityError)
+		{
+			if(Security.sandboxType == Security.LOCAL_WITH_FILE)
+				trace("NetConnection.connect not allowed in local-with-filesystem sandbox.");
+			else
+				trace("NetConnection.connect allowed in non-local-with-filesystem sandbox, but SecurityError thrown.");
+		}
+
+		stream_ns = new NetStream(connect_nc);
+		stream_ns.client = new Object;
+		stream_ns.client["onMetaData"]=this.onMetaData;
+
+		function netStatusHandler(p_evt:NetStatusEvent):void
+		{
+			if(p_evt.info.code == "NetStream.Play.FileStructureInvalid")
+			{
+				trace("File structure invalid");
+			}
+			else if(p_evt.info.code == "NetStream.Play.NoSupportedTrackFound")
+			{
+				trace("File doesn't contain supported tracks");
+			}
+		}
+
+		stream_ns.addEventListener(NetStatusEvent.NET_STATUS, netStatusHandler);
+
+		var videoWrapper:UIComponent = new UIComponent();
+		addChild(videoWrapper);
+		video = new Video();
+		videoWrapper.addChild(video);
+		video.attachNetStream(stream_ns);
+		video.addEventListener(MouseEvent.CLICK,videoClick);
+	}
+	private function onMetaData(item:Object):void
+	{
+		if(item.height > maxVideoHeight)
+		{
+			video.height = maxVideoHeight;
+			video.width = maxVideoHeight/item.height*item.width;
+		}
+		else
+		{
+			video.height = item.height;
+			video.width = item.width;
+		}
+		metadata = item;
+		trace("Full metadata:");
+		var key:String;
+		for(key in item)
+		{
+			trace(key + ":", item[key]);
+		}
+	}
+	private function statusInfo():void
+	{
+		progressRect.graphics.beginFill(0x800000);
+		progressRect.graphics.drawRect(20,320,450*(stream_ns.time/metadata.duration),15);
+		progressRect.graphics.endFill();
+		downloadProgressRect.graphics.beginFill(0x000080);
+		downloadProgressRect.graphics.drawRect(20,340,450*(stream_ns.bytesLoaded/stream_ns.bytesTotal),15);
+		downloadProgressRect.graphics.endFill();
+	}
+	private function playClick(e:Event):void
+	{
+		trace("Play button clicked");
+		try
+		{
+			if(Security.sandboxType == Security.REMOTE || 
+				Security.sandboxType == Security.LOCAL_WITH_NETWORK)
+			{
+				trace("Running in remote sandbox: playing from HTTP");
+				stream_ns.play(netVideoURL);
+			}
+			else
+			{
+				trace("Running in remote sandbox: playing local file");
+				stream_ns.play(localVideoPath);
+			}
+		}
+		catch(e:SecurityError)
+		{
+			trace("NetStream.play: SecurityError thrown");
+			trace(e.toString());
+		}
+
+		setInterval(statusInfo, 1000);
+	}
+	private function pauseClick(e:Event):void
+	{
+		if(!paused)
+		{
+			paused = true;
+			trace("Pause button clicked, pausing");
+			stream_ns.pause();
+		}
+		else
+		{
+			paused = false;
+			trace("Pause button clicked, resuming");
+			stream_ns.resume();
+		}
+	}
+	private function stopClick(e:Event):void
+	{
+		trace("Stop button clicked");
+		stream_ns.close();
+		paused = false;
+	}
+	private function seekClick(e:Event):void
+	{
+		trace("Seek button clicked");
+	}
+	private function videoClick(e:Event):void
+	{
+		trace("Video clicked");
+	}
+	]]>
+</mx:Script>
+
+
+<mx:UIComponent id="playRect" />
+<mx:UIComponent id="pauseRect" />
+<mx:UIComponent id="stopRect" />
+<mx:UIComponent id="seekRect" />
+<mx:UIComponent id="progressBorderRect" />
+<mx:UIComponent id="progressRect" />
+<mx:UIComponent id="downloadProgressBorderRect" />
+<mx:UIComponent id="downloadProgressRect" />
+
+</mx:Application>
+
