@@ -25,6 +25,23 @@ case "$1" in
 		cd obj-debug
 		cmake -DCMAKE_BUILD_TYPE=Debug ..
 		;;
+    --wasm)
+        echo "Starting to compile for WASM"
+        rm -rf obj-wasm
+        mkdir -p obj-wasm
+		cd obj-wasm
+        
+        # Helps that helped me
+        # https://github.com/emscripten-core/emscripten/issues/9614#issuecomment-540867480
+        
+        cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=/home/huw/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -s USE_ZLIB=1 ..
+		;;
+    --clang)
+        mkdir -p obj-clang
+		cd obj-clang
+        export CXX=`echo clang | sed -e 's/clang/clang++/;s/gcc/g++/'`
+		cmake -DCMAKE_BUILD_TYPE=Debug ..
+		;;
 	*)
 		mkdir -p obj-release
 		cd obj-release
@@ -35,4 +52,4 @@ esac
 # Use all available threads
 make -j $(grep -c processor /proc/cpuinfo)
 
-sudo make install
+#sudo make install
