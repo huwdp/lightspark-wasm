@@ -262,6 +262,66 @@ IF (ENABLE_LLVM)
 	ENDIF(NOT ${LLVM_STRING_VERSION} VERSION_LESS 7.0)
 ENDIF(ENABLE_LLVM)
 
+
+
+
+
+
+
+
+
+
+
+
+
+        message(STATUS "Building freetype")
+        file(DOWNLOAD
+            https://download.savannah.gnu.org/releases/freetype/freetype-2.10.1.tar.gz
+            ${PROJECT_BINARY_DIR}/freetype-2.10.1.tar.gz)
+        execute_process(COMMAND ${CMAKE_COMMAND}
+            -E tar xf freetype-2.10.1.tar.gz WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+        # patch toolchain for iOS
+        execute_process(COMMAND ${CMAKE_COMMAND} -E copy
+            ${PROJECT_SOURCE_DIR}/CMake/toolchain/ios.toolchain.xcode.cmake
+            freetype-2.10.1/builds/cmake/iOS.cmake
+            WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+        execute_process(COMMAND ${BUILD_COMMAND_COMMON}
+            -DBUILD_SHARED_LIBS=${OGREDEPS_SHARED}
+            -DCMAKE_DISABLE_FIND_PACKAGE_PNG=TRUE # disable third-party deps
+            -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE
+            -DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE
+            # workaround for broken iOS toolchain in freetype
+            -DPROJECT_SOURCE_DIR=${PROJECT_BINARY_DIR}/freetype-2.10.1
+            ${PROJECT_BINARY_DIR}/freetype-2.10.1
+            WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/freetype-2.10.1/objs)
+        execute_process(COMMAND ${CMAKE_COMMAND}
+            --build ${PROJECT_BINARY_DIR}/freetype-2.10.1/objs ${BUILD_COMMAND_OPTS})
+
+
+message(STATUS "Building zlib") # only needed for Assimp
+      file(DOWNLOAD
+          http://zlib.net/zlib-1.2.11.tar.gz
+          ${PROJECT_BINARY_DIR}/zlib-1.2.11.tar.gz
+          EXPECTED_MD5 1c9f62f0778697a09d36121ead88e08e)
+      execute_process(COMMAND ${CMAKE_COMMAND}
+          -E tar xf zlib-1.2.11.tar.gz WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+      execute_process(COMMAND ${BUILD_COMMAND_COMMON}
+          -DBUILD_SHARED_LIBS=${OGREDEPS_SHARED}
+          ${PROJECT_BINARY_DIR}/zlib-1.2.11
+          WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/zlib-1.2.11)
+      execute_process(COMMAND ${CMAKE_COMMAND}
+          --build ${PROJECT_BINARY_DIR}/zlib-1.2.11 ${BUILD_COMMAND_OPTS})
+
+
+find_package(ZLIB)
+find_package(Freetype)
+
+
+
+
+
+
+
 INCLUDE(FindZLIB REQUIRED)
 INCLUDE(FindFreetype REQUIRED)
 IF(NOT(ENABLE_GLES2))
