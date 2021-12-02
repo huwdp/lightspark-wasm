@@ -225,7 +225,7 @@ Tag* TagFactory::readTag(RootMovieClip* root, DefineSpriteTag *sprite)
 				ret=new DefineVideoStreamTag(h,f,root);
 				break;
 			case 61:
-				ret=new VideoFrameTag(h,f);
+				ret=new VideoFrameTag(h, f, root);
 				break;
 			case 63:
 				ret=new DebugIDTag(h,f);
@@ -368,12 +368,6 @@ DefineEditTextTag::DefineEditTextTag(RECORDHEADER h, std::istream& in, RootMovie
 	if(HasFont)
 	{
 		in >> FontID;
-		FontTag* fonttag =  dynamic_cast<FontTag*>(root->dictionaryLookup(FontID));
-		if (fonttag)
-		{
-			textData.font = fonttag->getFontname();
-			textData.fontID = fonttag->getId();
-		}
 		if(HasFontClass)
 			in >> FontClass;
 		in >> FontHeight;
@@ -394,7 +388,7 @@ DefineEditTextTag::DefineEditTextTag(RECORDHEADER h, std::istream& in, RootMovie
 		switch(Align)
 		{
 			case 0:
-				textData.autoSize = TextData::AS_LEFT;
+				textData.autoSize = AutoSize ? TextData::AS_LEFT : TextData::AS_NONE;
 				break;
 			case 1:
 				textData.autoSize = TextData::AS_RIGHT;
@@ -414,10 +408,12 @@ DefineEditTextTag::DefineEditTextTag(RECORDHEADER h, std::istream& in, RootMovie
 			LOG(LOG_NOT_IMPLEMENTED,"DefineEditTextTag:Indent on ID "<<CharacterID);
 	}
 	in >> VariableName;
+	if (AutoSize && textData.autoSize == TextData::AS_NONE)
+		textData.autoSize = TextData::AS_LEFT;
 	if(HasText)
 	{
 		in >> InitialText;
-		textData.text = (const char*)InitialText;
+		textData.setText((const char*)InitialText);
 	}
 	textData.wordWrap = WordWrap;
 	textData.multiline = Multiline;
@@ -432,8 +428,7 @@ DefineEditTextTag::DefineEditTextTag(RECORDHEADER h, std::istream& in, RootMovie
 	textData.width = (Bounds.Xmax-Bounds.Xmin)/20;
 	textData.height = (Bounds.Ymax-Bounds.Ymin)/20;
 	textData.leading = Leading/20;
-	if (AutoSize)
-		textData.autoSize = TextData::AS_LEFT;
+	textData.isPassword = Password;
 }
 
 ASObject* DefineEditTextTag::instance(Class_base* c)
@@ -445,8 +440,17 @@ ASObject* DefineEditTextTag::instance(Class_base* c)
 		else
 			c=Class<AVM1TextField>::getClass(loadedFrom->getSystemState());
 	}
+	if (HasFont && textData.fontID!=this->FontID)
+	{
+		FontTag* fonttag =  dynamic_cast<FontTag*>(loadedFrom->dictionaryLookup(FontID));
+		if (fonttag)
+		{
+			textData.font = fonttag->getFontname();
+			textData.fontID = fonttag->getId();
+		}
+	}
 	//TODO: check
-	assert_and_throw(bindedTo==NULL);
+	assert_and_throw(bindedTo==nullptr);
 	TextField* ret= loadedFrom->usesActionScript3 ? 
 					new (c->memoryAccount) TextField(c, textData, !NoSelect, ReadOnly,VariableName,this) :
 					new (c->memoryAccount) AVM1TextField(c, textData, !NoSelect, ReadOnly,VariableName,this);
@@ -632,9 +636,17 @@ DefineFontInfoTag::DefineFontInfoTag(RECORDHEADER h, std::istream& in,RootMovieC
 	root->registerEmbeddedFont(fonttag->getFontname(),fonttag);
 }
 
+FontTag::FontTag(RECORDHEADER h, int _scaling, RootMovieClip* root):DictionaryTag(h,root), scaling(_scaling)
+{
+	FILLSTYLE fs(1);
+	fs.FillStyleType = SOLID_FILL;
+	fs.Color = RGBA(255,255,255,255);
+	fillStyles.push_back(fs);
+}
+
 ASObject* FontTag::instance(Class_base* c)
 { 
-	Class_base* retClass=NULL;
+	Class_base* retClass=nullptr;
 	if(c)
 		retClass=c;
 	else if(bindedTo)
@@ -648,8 +660,57 @@ ASObject* FontTag::instance(Class_base* c)
 	return ret;
 }
 
+const TextureChunk* FontTag::getCharTexture(const CharIterator& chrIt, int fontpixelsize,uint32_t& codetableindex)
+{
+	assert (*chrIt != 13 && *chrIt != 10);
+	int tokenscaling = fontpixelsize * this->scaling;
+	codetableindex=UINT32_MAX;
+
+	for (unsigned int i = 0; i < CodeTable.size(); i++)
+	{
+		if (CodeTable[i] == *chrIt)
+		{
+			codetableindex=i;
+			auto it = getGlyphShapes().at(i).scaledtexturecache.find(tokenscaling);
+			if (it == getGlyphShapes().at(i).scaledtexturecache.end())
+			{
+				const std::vector<SHAPERECORD>& sr = getGlyphShapes().at(i).ShapeRecords;
+				number_t ystart = getRenderCharStartYPos()/1024.0f;
+				ystart *=number_t(tokenscaling);
+				MATRIX glyphMatrix(number_t(tokenscaling)/1024.0f, number_t(tokenscaling)/1024.0f, 0, 0,0,ystart);
+				tokensVector tmptokens;
+				TokenContainer::FromShaperecordListToShapeVector(sr,tmptokens,fillStyles,glyphMatrix);
+				number_t xmin, xmax, ymin, ymax;
+				if (!TokenContainer::boundsRectFromTokens(tmptokens,0.05,xmin,xmax,ymin,ymax))
+					return nullptr;
+				std::vector<IDrawable::MaskData> masks;
+				CairoTokenRenderer r(tmptokens,MATRIX()
+							, xmin, ymin, xmax, ymax
+							, xmin, ymin, xmax, ymax,0
+							, 1, 1
+							, false,_NR<DisplayObject>()
+							, 0.05,1.0, masks
+							, 1.0,1.0,1.0,1.0
+							, 0,0,0,0
+							, true,0,0);
+				uint8_t* buf = r.getPixelBuffer();
+				CharacterRenderer* renderer = new CharacterRenderer(buf,xmax,ymax);
+				getSys()->getRenderThread()->addUploadJob(renderer);
+				it = getGlyphShapes().at(i).scaledtexturecache.insert(make_pair(tokenscaling,renderer)).first;
+			}
+			return &(*it).second->getTexture();
+		}
+	}
+	return nullptr;
+}
+
 bool FontTag::hasGlyphs(const tiny_string text) const
 {
+	if (!CodeTable.size())
+	{
+		// always return false if CodeTable is empty;
+		return false;
+	}
 	for (CharIterator it = text.begin(); it != text.end(); it++)
 	{
 		bool found = false;
@@ -667,6 +728,48 @@ bool FontTag::hasGlyphs(const tiny_string text) const
 			return false;
 	}
 	return true;
+}
+
+number_t DefineFontTag::getRenderCharStartYPos() const 
+{
+	return 1024;
+}
+
+number_t DefineFontTag::getRenderCharAdvance(uint32_t index) const
+{
+	return 0;
+}
+
+void DefineFontTag::getTextBounds(const tiny_string& text, int fontpixelsize, number_t& width, number_t& height)
+{
+	int tokenscaling = fontpixelsize * this->scaling;
+	width=0;
+	height=tokenscaling;
+	number_t tmpwidth=0;
+
+	for (CharIterator it = text.begin(); it != text.end(); it++)
+	{
+		if (*it == 13 || *it == 10)
+		{
+			if (width < tmpwidth)
+				width = tmpwidth;
+			tmpwidth = 0;
+			height+=tokenscaling;
+		}
+		else
+		{
+			for (unsigned int i = 0; i < CodeTable.size(); i++)
+			{
+				if (CodeTable[i] == *it)
+				{
+					tmpwidth += tokenscaling;
+					break;
+				}
+			}
+		}
+	}
+	if (width < tmpwidth)
+		width = tmpwidth;
 }
 
 DefineFontTag::DefineFontTag(RECORDHEADER h, std::istream& in, RootMovieClip* root):FontTag(h, 20, root)
@@ -695,17 +798,12 @@ DefineFontTag::DefineFontTag(RECORDHEADER h, std::istream& in, RootMovieClip* ro
 	root->registerEmbeddedFont("",this);
 }
 
-void DefineFontTag::fillTextTokens(tokensVector &tokens, const tiny_string text, int fontpixelsize, RGB textColor, uint32_t leading, uint32_t startpos) const
+void DefineFontTag::fillTextTokens(tokensVector &tokens, const tiny_string text, int fontpixelsize, const list<FILLSTYLE>& fillstyleColor, int32_t leading, int32_t startposx, int32_t startposy)
 {
-	std::list<FILLSTYLE> fillStyles;
 	Vector2 curPos;
-	FILLSTYLE fs(1);
-	fs.FillStyleType = SOLID_FILL;
-	fs.Color = RGBA(textColor.Red,textColor.Green,textColor.Blue,255);
-	fillStyles.push_back(fs);
 
 	int tokenscaling = fontpixelsize * this->scaling;
-	curPos.y = (1024);
+	curPos.y = 1024 + startposy*1024;
 
 	for (CharIterator it = text.begin(); it != text.end(); it++)
 	{
@@ -723,13 +821,10 @@ void DefineFontTag::fillTextTokens(tokensVector &tokens, const tiny_string text,
 				{
 					const std::vector<SHAPERECORD>& sr = getGlyphShapes().at(i).ShapeRecords;
 					Vector2 glyphPos = curPos*tokenscaling;
-	
 					MATRIX glyphMatrix(tokenscaling, tokenscaling, 0, 0,
-							   glyphPos.x+startpos*1024*20,
+							   glyphPos.x+startposx*1024*20,
 							   glyphPos.y);
-	
-					TokenContainer::FromShaperecordListToShapeVector(sr,tokens,fillStyles,glyphMatrix);
-	
+					TokenContainer::FromShaperecordListToShapeVector(sr,tokens,fillstyleColor,glyphMatrix);
 					curPos.x += tokenscaling;
 					found = true;
 					break;
@@ -740,6 +835,53 @@ void DefineFontTag::fillTextTokens(tokensVector &tokens, const tiny_string text,
 		}
 	}
 }
+number_t DefineFont2Tag::getRenderCharStartYPos() const
+{
+	return (1024+this->FontLeading/2.0);
+}
+
+number_t DefineFont2Tag::getRenderCharAdvance(uint32_t index) const
+{
+	if (index < FontAdvanceTable.size())
+		return FontAdvanceTable[index]/1024.0;
+	return 0;
+}
+
+void DefineFont2Tag::getTextBounds(const tiny_string& text, int fontpixelsize, number_t& width, number_t& height)
+{
+	int tokenscaling = fontpixelsize * this->scaling;
+	width=0;
+	height= tokenscaling;
+	number_t tmpwidth=0;
+
+	for (CharIterator it = text.begin(); it != text.end(); it++)
+	{
+		if (*it == 13 || *it == 10)
+		{
+			if (width < tmpwidth)
+				width = tmpwidth;
+			tmpwidth = 0;
+			height+=tokenscaling;
+		}
+		else
+		{
+			for (unsigned int i = 0; i < CodeTable.size(); i++)
+			{
+				if (CodeTable[i] == *it)
+				{
+					if (FontFlagsHasLayout)
+						tmpwidth += FontAdvanceTable[i];
+					else
+						tmpwidth += tokenscaling;
+					break;
+				}
+			}
+		}
+	}
+	if (width < tmpwidth)
+		width = tmpwidth;
+}
+
 DefineFont2Tag::DefineFont2Tag(RECORDHEADER h, std::istream& in, RootMovieClip* root):FontTag(h, 20, root)
 {
 	LOG(LOG_TRACE,_("DefineFont2"));
@@ -834,17 +976,12 @@ DefineFont2Tag::DefineFont2Tag(RECORDHEADER h, std::istream& in, RootMovieClip* 
 	root->registerEmbeddedFont(getFontname(),this);
 }
 
-void DefineFont2Tag::fillTextTokens(tokensVector &tokens, const tiny_string text, int fontpixelsize, RGB textColor, uint32_t leading, uint32_t startpos) const
+void DefineFont2Tag::fillTextTokens(tokensVector &tokens, const tiny_string text, int fontpixelsize, const list<FILLSTYLE>& fillstyleColor, int32_t leading, int32_t startposx, int32_t startposy)
 {
-	std::list<FILLSTYLE> fillStyles;
 	Vector2 curPos;
-	FILLSTYLE fs(1);
-	fs.FillStyleType = SOLID_FILL;
-	fs.Color = RGBA(textColor.Red,textColor.Green,textColor.Blue,255);
-	fillStyles.push_back(fs);
 
 	int tokenscaling = fontpixelsize * this->scaling;
-	curPos.y = (1024+this->FontLeading/2.0);
+	curPos.y = (1024+this->FontLeading/2.0)+startposy*1024;
 
 	for (CharIterator it = text.begin(); it != text.end(); it++)
 	{
@@ -862,13 +999,10 @@ void DefineFont2Tag::fillTextTokens(tokensVector &tokens, const tiny_string text
 				{
 					const std::vector<SHAPERECORD>& sr = getGlyphShapes().at(i).ShapeRecords;
 					Vector2 glyphPos = curPos*tokenscaling;
-	
 					MATRIX glyphMatrix(tokenscaling, tokenscaling, 0, 0,
-							   glyphPos.x+startpos*1024*20,
+							   glyphPos.x+startposx*1024*20,
 							   glyphPos.y);
-	
-					TokenContainer::FromShaperecordListToShapeVector(sr,tokens,fillStyles,glyphMatrix);
-	
+					TokenContainer::FromShaperecordListToShapeVector(sr,tokens,fillstyleColor,glyphMatrix);
 					if (FontFlagsHasLayout)
 						curPos.x += FontAdvanceTable[i];
 					else
@@ -881,6 +1015,54 @@ void DefineFont2Tag::fillTextTokens(tokensVector &tokens, const tiny_string text
 				LOG(LOG_INFO,"DefineFont2Tag:Character not found:"<<(int)*it<<" "<<text<<" "<<this->getFontname()<<" "<<CodeTable.size());
 		}
 	}
+}
+
+number_t DefineFont3Tag::getRenderCharStartYPos() const
+{
+	// not in the specs but it seems that Adobe subtracts the FontDescent from the vertical starting point for rendering
+	return 1024.0*20.0 - ((FontAscent+FontDescent) < 1024.0*20.0 ? number_t(FontDescent) : 0);
+}
+
+number_t DefineFont3Tag::getRenderCharAdvance(uint32_t index) const
+{
+	if (index < FontAdvanceTable.size())
+		return FontAdvanceTable[index]/1024.0/20.0;
+	return 0;
+}
+
+void DefineFont3Tag::getTextBounds(const tiny_string& text, int fontpixelsize, number_t& width, number_t& height)
+{
+	int tokenscaling = fontpixelsize * this->scaling;
+	width=0;
+	height= ((FontAscent+FontDescent+FontLeading)/1024.0/20.0)* tokenscaling;
+	number_t tmpwidth=0;
+
+	for (CharIterator it = text.begin(); it != text.end(); it++)
+	{
+		if (*it == 13 || *it == 10)
+		{
+			if (width < tmpwidth)
+				width = tmpwidth;
+			tmpwidth = 0;
+			height+=tokenscaling+ (this->FontLeading/1024.0/20.0)*this->scaling;
+		}
+		else
+		{
+			for (unsigned int i = 0; i < CodeTable.size(); i++)
+			{
+				if (CodeTable[i] == *it)
+				{
+					if (FontFlagsHasLayout)
+						tmpwidth += FontAdvanceTable[i]/1024.0/20.0 * tokenscaling;
+					else
+						tmpwidth += tokenscaling;
+					break;
+				}
+			}
+		}
+	}
+	if (width < tmpwidth)
+		width = tmpwidth;
 }
 
 DefineFont3Tag::DefineFont3Tag(RECORDHEADER h, std::istream& in, RootMovieClip* root):FontTag(h, 1, root),CodeTableOffset(0)
@@ -1002,17 +1184,12 @@ DefineFont3Tag::DefineFont3Tag(RECORDHEADER h, std::istream& in, RootMovieClip* 
 
 }
 
-void DefineFont3Tag::fillTextTokens(tokensVector &tokens, const tiny_string text, int fontpixelsize, RGB textColor, uint32_t leading, uint32_t startpos) const
+void DefineFont3Tag::fillTextTokens(tokensVector &tokens, const tiny_string text, int fontpixelsize, const list<FILLSTYLE>& fillstyleColor, int32_t leading, int32_t startposx, int32_t startposy)
 {
-	std::list<FILLSTYLE> fillStyles;
 	Vector2 curPos;
-	FILLSTYLE fs(1);
-	fs.FillStyleType = SOLID_FILL;
-	fs.Color = RGBA(textColor.Red,textColor.Green,textColor.Blue,255);
-	fillStyles.push_back(fs);
 
 	int tokenscaling = fontpixelsize * this->scaling;
-	curPos.y = (20*1024+this->FontLeading/2.0) * this->scaling;
+	curPos.y = (this->FontAscent + startposy*1024)*this->scaling;
 
 	for (CharIterator it = text.begin(); it != text.end(); it++)
 	{
@@ -1030,13 +1207,10 @@ void DefineFont3Tag::fillTextTokens(tokensVector &tokens, const tiny_string text
 				{
 					const std::vector<SHAPERECORD>& sr = getGlyphShapes().at(i).ShapeRecords;
 					Vector2 glyphPos = curPos*tokenscaling;
-	
 					MATRIX glyphMatrix(tokenscaling, tokenscaling, 0, 0,
-							   glyphPos.x+startpos*1024*20* this->scaling,
+							   glyphPos.x+startposx*1024*20* this->scaling,
 							   glyphPos.y);
-	
-					TokenContainer::FromShaperecordListToShapeVector(sr,tokens,fillStyles,glyphMatrix);
-	
+					TokenContainer::FromShaperecordListToShapeVector(sr,tokens,fillstyleColor,glyphMatrix);
 					if (FontFlagsHasLayout)
 						curPos.x += FontAdvanceTable[i];
 					found = true;
@@ -1086,6 +1260,7 @@ ASObject* DefineFont4Tag::instance(Class_base* c)
 
 BitmapTag::BitmapTag(RECORDHEADER h,RootMovieClip* root):DictionaryTag(h,root),bitmap(_MR(new BitmapContainer(root->getSystemState()->tagsMemory)))
 {
+	bitmap->setConstant();
 }
 
 _R<BitmapContainer> BitmapTag::getBitmap() const {
@@ -1181,13 +1356,13 @@ ASObject* BitmapTag::instance(Class_base* c)
 	//Also BitmapData is used in the wild though, so support both cases
 
 	Class_base* realClass=(c)?c:bindedTo;
-	Class_base* classRet = Class<BitmapData>::getClass(loadedFrom->getSystemState());
-
-	if(!realClass)
-		return new (classRet->memoryAccount) BitmapData(classRet, bitmap);
+	Class_base* classRet = nullptr;
 
 	if (loadedFrom->usesActionScript3)
 	{
+		classRet = Class<BitmapData>::getClass(loadedFrom->getSystemState());
+		if(!realClass)
+			return new (classRet->memoryAccount) BitmapData(classRet, bitmap);
 		if(realClass->isSubClass(Class<Bitmap>::getClass(realClass->getSystemState())))
 		{
 			BitmapData* ret=new (classRet->memoryAccount) BitmapData(classRet, bitmap);
@@ -1197,9 +1372,12 @@ ASObject* BitmapTag::instance(Class_base* c)
 	}
 	else
 	{
+		classRet = Class<AVM1BitmapData>::getClass(loadedFrom->getSystemState());
+		if(!realClass)
+			return new (classRet->memoryAccount) AVM1BitmapData(classRet, bitmap);
 		if(realClass->isSubClass(Class<AVM1Bitmap>::getClass(realClass->getSystemState())))
 		{
-			BitmapData* ret=new (classRet->memoryAccount) BitmapData(classRet, bitmap);
+			AVM1BitmapData* ret=new (classRet->memoryAccount) AVM1BitmapData(classRet, bitmap);
 			Bitmap* bitmapRet= new (realClass->memoryAccount) AVM1Bitmap(realClass,_MR(ret));
 			return bitmapRet;
 		}
@@ -1213,8 +1391,7 @@ ASObject* BitmapTag::instance(Class_base* c)
 	return new (classRet->memoryAccount) BitmapData(classRet, bitmap);
 }
 
-DefineTextTag::DefineTextTag(RECORDHEADER h, istream& in, RootMovieClip* root,int v):DictionaryTag(h,root),
-	tokens(reporter_allocator<GeomToken>(loadedFrom->getSystemState()->tagsMemory)),version(v)
+DefineTextTag::DefineTextTag(RECORDHEADER h, istream& in, RootMovieClip* root,int v):DictionaryTag(h,root),version(v)
 {
 	in >> CharacterId >> TextBounds >> TextMatrix >> GlyphBits >> AdvanceBits;
 	assert(v==1 || v==2);
@@ -1248,13 +1425,12 @@ ASObject* DefineTextTag::instance(Class_base* c)
 	return ret;
 }
 
-void DefineTextTag::computeCached() const
+void DefineTextTag::computeCached()
 {
 	if(!tokens.empty())
 		return;
 
-	const FontTag* curFont = nullptr;
-	std::list<FILLSTYLE> fillStyles;
+	FontTag* curFont = nullptr;
 	Vector2 curPos;
 	FILLSTYLE fs(1);
 	fs.FillStyleType = SOLID_FILL;
@@ -1278,8 +1454,8 @@ void DefineTextTag::computeCached() const
 	{
 		if(TextRecords[i].StyleFlagsHasFont)
 		{
-			const DictionaryTag* it3=loadedFrom->dictionaryLookup(TextRecords[i].FontID);
-			curFont=dynamic_cast<const FontTag*>(it3);
+			DictionaryTag* it3=loadedFrom->dictionaryLookup(TextRecords[i].FontID);
+			curFont=dynamic_cast<FontTag*>(it3);
 			assert_and_throw(curFont);
 		}
 		assert_and_throw(curFont);
@@ -1305,7 +1481,7 @@ void DefineTextTag::computeCached() const
 		for(uint32_t j=0;j<TextRecords[i].GlyphEntries.size();++j)
 		{
 			const GLYPHENTRY& ge = TextRecords[i].GlyphEntries[j];
-			const std::vector<SHAPERECORD>& sr = curFont->getGlyphShapes().at(ge.GlyphIndex).ShapeRecords;
+			std::vector<SHAPERECORD>& sr = curFont->getGlyphShapes().at(ge.GlyphIndex).ShapeRecords;
 			Vector2 glyphPos = curPos*twipsScaling;
 
 			MATRIX glyphMatrix(scaling, scaling, 0, 0, 
@@ -1341,7 +1517,7 @@ ASObject *DefineShapeTag::instance(Class_base *c)
 {
 	if (!tokens)
 	{
-		tokens = new tokensVector(loadedFrom->getSystemState()->tagsMemory);
+		tokens = new tokensVector();
 		for (auto it = Shapes.FillStyles.FillStyles.begin(); it != Shapes.FillStyles.FillStyles.end(); it++)
 		{
 			it->ShapeBounds = ShapeBounds;
@@ -1363,11 +1539,6 @@ ASObject *DefineShapeTag::instance(Class_base *c)
 	}
 	ret->setupShape(this, 1.0f/20.0f);
 	return ret;
-}
-MATRIX DefineShapeTag::MapToBoundsForButton(const MATRIX &mat)
-{
-	MATRIX m (1,1,0,0,ShapeBounds.Xmin/20,ShapeBounds.Ymin/20);
-	return mat.multiplyMatrix(m);
 }
 
 void DefineShapeTag::resizeCompleted()
@@ -1417,11 +1588,23 @@ DefineMorphShapeTag::DefineMorphShapeTag(RECORDHEADER h, std::istream& in, RootM
 
 ASObject* DefineMorphShapeTag::instance(Class_base* c)
 {
-	assert_and_throw(bindedTo==NULL);
-	if(c==NULL)
+	assert_and_throw(bindedTo==nullptr);
+	if(c==nullptr)
 		c=Class<MorphShape>::getClass(loadedFrom->getSystemState());
 	MorphShape* ret=new (c->memoryAccount) MorphShape(c, this);
 	return ret;
+}
+
+void DefineMorphShapeTag::getTokensForRatio(tokensVector& tokens, uint32_t ratio)
+{
+	auto it = tokensmap.find(ratio);
+	if (it==tokensmap.end())
+	{
+		it = tokensmap.insert(make_pair(ratio,tokensVector())).first;
+		TokenContainer::FromDefineMorphShapeTagToShapeVector(this,it->second,ratio);
+	}
+	tokens.filltokens.assign(it->second.filltokens.begin(),it->second.filltokens.end());
+	tokens.stroketokens.assign(it->second.stroketokens.begin(),it->second.stroketokens.end());
 }
 
 DefineMorphShape2Tag::DefineMorphShape2Tag(RECORDHEADER h, std::istream& in, RootMovieClip* root):DefineMorphShapeTag(h, root, 2)
@@ -1542,7 +1725,7 @@ ShowFrameTag::ShowFrameTag(RECORDHEADER h, std::istream& in):Tag(h)
 
 void PlaceObject2Tag::setProperties(DisplayObject* obj, DisplayObjectContainer* parent) const
 {
-	assert_and_throw(obj && PlaceFlagHasCharacter);
+	assert_and_throw(obj);
 
 	//TODO: move these three attributes in PlaceInfo
 	if(PlaceFlagHasColorTransform)
@@ -1572,6 +1755,13 @@ void PlaceObject2Tag::setProperties(DisplayObject* obj, DisplayObjectContainer* 
 		//Remove the automatic name set by the DisplayObject constructor
 		obj->name = BUILTIN_STRINGS::EMPTY;
 	}
+	if (parent && parent->computeCacheAsBitmap())
+	{
+		parent->incRef();
+		obj->cachedAsBitmapOf=_MR(parent);
+	}
+	else
+		obj->cachedAsBitmapOf=parent->cachedAsBitmapOf;
 }
 
 void PlaceObject2Tag::execute(DisplayObjectContainer* parent, bool inskipping)
@@ -1603,7 +1793,7 @@ void PlaceObject2Tag::execute(DisplayObjectContainer* parent, bool inskipping)
 		if(placedTag==nullptr)
 		{
 			// tag for CharacterID may be defined after this tag was defined, so we look for it again in the dictionary
-			RootMovieClip* root = parent->getRoot().getPtr();
+			RootMovieClip* root = parent->loadedFrom;
 			if (root)
 				placedTag=root->dictionaryLookup(CharacterId);
 		}
@@ -1639,7 +1829,7 @@ void PlaceObject2Tag::execute(DisplayObjectContainer* parent, bool inskipping)
 			if (instance->is<BitmapData>())
 				toAdd = parent->loadedFrom->usesActionScript3 ?
 							Class<Bitmap>::getInstanceS(instance->getSystemState(),_R<BitmapData>(instance->as<BitmapData>())) :
-							Class<AVM1Bitmap>::getInstanceS(instance->getSystemState(),_R<BitmapData>(instance->as<BitmapData>()));
+							Class<AVM1Bitmap>::getInstanceS(instance->getSystemState(),_R<AVM1BitmapData>(instance->as<AVM1BitmapData>()));
 			else
 				toAdd=dynamic_cast<DisplayObject*>(instance);
 			if(!toAdd && instance)
@@ -1657,10 +1847,10 @@ void PlaceObject2Tag::execute(DisplayObjectContainer* parent, bool inskipping)
 		if (currchar && !PlaceFlagHasMatrix) // reuse matrix of existing DispayObject at this depth
 			Matrix = currchar->getMatrix();
 
-		//The matrix must be set before invoking the constructor
-		toAdd->setLegacyMatrix(placedTag->MapToBounds(Matrix));
-		toAdd->legacy = true;
 		toAdd->loadedFrom=placedTag->loadedFrom;
+		//The matrix must be set before invoking the constructor
+		toAdd->setLegacyMatrix(Matrix);
+		toAdd->legacy = true;
 
 		setProperties(toAdd, parent);
 
@@ -1686,20 +1876,19 @@ void PlaceObject2Tag::execute(DisplayObjectContainer* parent, bool inskipping)
 			currchar=toAdd;
 		}
 	}
-	else if (PlaceFlagHasMatrix)
+	else 
 	{
-		if(placedTag==nullptr && currchar)
+		if (currchar)
+			setProperties(currchar, parent);
+		if (PlaceFlagHasMatrix)
 		{
-			// tag for CharacterID may be defined after this tag was defined, so we look for it again in the dictionary
-			RootMovieClip* root = parent->getRoot().getPtr();
-			if (root)
-				placedTag=root->dictionaryLookup(currchar->getTagID());
-		}
-		if (placedTag)
-			parent->transformLegacyChildAt(LEGACY_DEPTH_START+Depth,placedTag->MapToBounds(Matrix));
-		else
-		{
-			LOG(LOG_ERROR,"transformLegacyChild for object without placedTag");
+			if(placedTag==nullptr && currchar)
+			{
+				// tag for CharacterID may be defined after this tag was defined, so we look for it again in the dictionary
+				RootMovieClip* root = parent->loadedFrom;
+				if (root)
+					placedTag=root->dictionaryLookup(currchar->getTagID());
+			}
 			parent->transformLegacyChildAt(LEGACY_DEPTH_START+Depth,Matrix);
 		}
 	}
@@ -1718,8 +1907,12 @@ void PlaceObject2Tag::execute(DisplayObjectContainer* parent, bool inskipping)
 	{
 		parent->setupClipActionsAt(LEGACY_DEPTH_START+Depth,ClipActions);
 	}
+
 	if (PlaceFlagHasRatio)
-		parent->checkRatioForLegacyChildAt(LEGACY_DEPTH_START+Depth,Ratio,inskipping);
+		parent->checkRatioForLegacyChildAt(LEGACY_DEPTH_START + Depth, Ratio, inskipping);
+	else if (PlaceFlagHasCharacter)
+		parent->checkRatioForLegacyChildAt(LEGACY_DEPTH_START + Depth, 0, inskipping);
+
 	if(PlaceFlagHasColorTransform)
 		parent->checkColorTransformForLegacyChildAt(LEGACY_DEPTH_START+Depth,ColorTransformWithAlpha);
 	if (newInstance && PlaceFlagHasClipAction && this->ClipActions.AllEventFlags.ClipEventConstruct && currchar)
@@ -1747,6 +1940,10 @@ void PlaceObject2Tag::execute(DisplayObjectContainer* parent, bool inskipping)
 				ACTIONRECORD::executeActions(currchar ,&context,it->actions,it->startactionpos,m);
 			}
 		}
+	}
+	if (currchar)
+	{
+		currchar->invalidateCachedAsBitmapOf();
 	}
 }
 
@@ -1795,13 +1992,11 @@ PlaceObject2Tag::PlaceObject2Tag(RECORDHEADER h, std::istream& in, RootMovieClip
 
 	assert_and_throw(!(PlaceFlagHasCharacter && CharacterId==0));
 
-	if(PlaceFlagHasCharacter)
-		placedTag=root->dictionaryLookup(CharacterId);
 }
 
 PlaceObject3Tag::PlaceObject3Tag(RECORDHEADER h, std::istream& in, RootMovieClip* root):PlaceObject2Tag(h,root->version)
 {
-	LOG(LOG_TRACE,_("PlaceObject3"));
+	LOG(LOG_TRACE,"PlaceObject3");
 	uint32_t start = in.tellg();
 
 	BitStream bs(in);
@@ -1880,8 +2075,6 @@ PlaceObject3Tag::PlaceObject3Tag(RECORDHEADER h, std::istream& in, RootMovieClip
 
 	assert_and_throw(!(PlaceFlagHasCharacter && CharacterId==0))
 
-	if(PlaceFlagHasCharacter)
-		placedTag=root->dictionaryLookup(CharacterId);
 }
 
 void PlaceObject3Tag::setProperties(DisplayObject *obj, DisplayObjectContainer *parent) const
@@ -1891,47 +2084,8 @@ void PlaceObject3Tag::setProperties(DisplayObject *obj, DisplayObjectContainer *
 		obj->setBlendMode(BlendMode);
 	if (PlaceFlagHasVisible)
 		obj->setVisible(Visible);
-	if (this->SurfaceFilterList.Filters.size())
-	{
-		if (obj->filters.isNull())
-			obj->filters = _MR(Class<Array>::getInstanceSNoArgsNoFreelist(obj->getSystemState()));
-		auto it = this->SurfaceFilterList.Filters.begin();
-		while (it != this->SurfaceFilterList.Filters.end())
-		{
-			switch(it->FilterID)
-			{
-				case 0:
-					obj->filters->push(asAtomHandler::fromObject(Class<DropShadowFilter>::getInstanceS(obj->getSystemState(),it->DropShadowFilter)));
-					break;
-				case 1:
-					obj->filters->push(asAtomHandler::fromObject(Class<BlurFilter>::getInstanceS(obj->getSystemState(),it->BlurFilter)));
-					break;
-				case 2:
-					obj->filters->push(asAtomHandler::fromObject(Class<GlowFilter>::getInstanceS(obj->getSystemState(),it->GlowFilter)));
-					break;
-				case 3:
-					obj->filters->push(asAtomHandler::fromObject(Class<BevelFilter>::getInstanceS(obj->getSystemState(),it->BevelFilter)));
-					break;
-				case 4:
-					obj->filters->push(asAtomHandler::fromObject(Class<GradientGlowFilter>::getInstanceS(obj->getSystemState(),it->GradientGlowFilter)));
-					break;
-				case 5:
-					obj->filters->push(asAtomHandler::fromObject(Class<ConvolutionFilter>::getInstanceS(obj->getSystemState(),it->ConvolutionFilter)));
-					break;
-				case 6:
-					obj->filters->push(asAtomHandler::fromObject(Class<ColorMatrixFilter>::getInstanceS(obj->getSystemState(),it->ColorMatrixFilter)));
-					break;
-				case 7:
-					obj->filters->push(asAtomHandler::fromObject(Class<GradientBevelFilter>::getInstanceS(obj->getSystemState(),it->GradientBevelFilter)));
-					break;
-				default:
-					LOG(LOG_ERROR,"Unsupported Filter Id " << (int)it->FilterID);
-					break;
-			}
-			it++;
-		}
-	}
-	
+	obj->cacheAsBitmap=this->BitmapCache;
+	obj->setFilters(this->SurfaceFilterList);
 }
 
 void SetBackgroundColorTag::execute(RootMovieClip* root) const
@@ -2059,7 +2213,7 @@ DefineButtonTag::DefineButtonTag(RECORDHEADER h, std::istream& in, int version, 
 
 ASObject* DefineButtonTag::instance(Class_base* c)
 {
-	DisplayObject* states[4] = {NULL, NULL, NULL, NULL};
+	DisplayObject* states[4] = {nullptr, nullptr, nullptr, nullptr};
 	bool isSprite[4] = {false, false, false, false};
 	uint32_t curDepth[4];
 
@@ -2088,14 +2242,15 @@ ASObject* DefineButtonTag::instance(Class_base* c)
 			DisplayObject* state=dynamic_cast<DisplayObject*>(dict->instance());
 			assert_and_throw(state);
 			//The matrix must be set before invoking the constructor
-			state->setLegacyMatrix(dict->MapToBoundsForButton(i->PlaceMatrix));
-			
+			state->setLegacyMatrix(dict->MapToBounds(i->PlaceMatrix));
+			state->legacy=true;
 			state->name = BUILTIN_STRINGS::EMPTY;
 			if (i->ButtonHasBlendMode && i->buttonVersion == 2)
 				state->setBlendMode(i->BlendMode);
-			if (i->ButtonHasFilterList && i->FilterList.Filters.size() != 0)
-				LOG(LOG_NOT_IMPLEMENTED,"DefineButtonTag: FilterList "<<this->getId());
-			state->colorTransform=_NR<ColorTransform>(Class<ColorTransform>::getInstanceS(state->getSystemState(),i->ColorTransform));
+			if (i->ButtonHasFilterList)
+				state->setFilters(i->FilterList);
+			if (i->ColorTransform.isfilled())
+				state->colorTransform=_NR<ColorTransform>(Class<ColorTransform>::getInstanceS(state->getSystemState(),i->ColorTransform));
 
 			if(states[j] == nullptr)
 			{
@@ -2337,8 +2492,7 @@ void StartSoundTag::execute(DisplayObjectContainer *parent, bool inskipping)
 	if (!soundTag)
 		return;
 
-	if (SoundInfo.HasEnvelope || SoundInfo.HasLoops ||
-	    SoundInfo.HasOutPoint || SoundInfo.HasInPoint)
+	if (SoundInfo.HasOutPoint || SoundInfo.HasInPoint)
 	{
 		LOG(LOG_NOT_IMPLEMENTED, "StartSoundTag: some modifiers not supported");
 	}
@@ -2363,8 +2517,11 @@ void StartSoundTag::play(DefineSoundTag *soundTag)
 			soundTag->getSoundData(),
 			AudioFormat(soundTag->getAudioCodec(),
 			    soundTag->getSampleRate(),
-			    soundTag->getChannels()),false));
+			    soundTag->getChannels()),
+			false,this));
 		soundTag->soundchanel->setConstant();
+		if (this->SoundInfo.HasLoops)
+			soundTag->soundchanel->setLoops(this->SoundInfo.LoopCount);
 	}
 	if (this->SoundInfo.SyncNoMultiple && soundTag->soundchanel->isPlaying())
 		return;
@@ -2556,19 +2713,23 @@ DefineBitsJPEG3Tag::DefineBitsJPEG3Tag(RECORDHEADER h, std::istream& in, RootMov
 		istream zfstream(&zf);
 		zfstream.exceptions ( istream::eofbit | istream::failbit | istream::badbit );
 
+		vector<char> alphaDataUncompressed;
+		alphaDataUncompressed.resize(bitmap->getHeight()*bitmap->getWidth());
+		
 		//Catch the exception if the stream ends
 		try
 		{
-			//Set alpha
-			for(int32_t i=0;i<bitmap->getHeight();i++)
-			{
-				for(int32_t j=0;j<bitmap->getWidth();j++)
-					bitmap->setAlpha(j, i, zfstream.get());
-			}
+			zfstream.read(alphaDataUncompressed.data(),bitmap->getHeight()*bitmap->getWidth());
 		}
 		catch(std::exception& e)
 		{
 			LOG(LOG_ERROR, "Exception while parsing Alpha data in DefineBitsJPEG3");
+		}
+		uint8_t* d = bitmap->getData();
+		//Set alpha
+		for(int32_t i=0;i<bitmap->getHeight()*bitmap->getWidth();i++)
+		{
+			d[i*4+3]=alphaDataUncompressed[i];
 		}
 	}
 }
@@ -2770,7 +2931,7 @@ AdditionalDataTag::AdditionalDataTag(RECORDHEADER h, istream &in):Tag(h)
 		in.read((char*)bytes,numbytes);
 	}
 }
-VideoFrameTag::VideoFrameTag(RECORDHEADER h, istream &in):DisplayListTag(h)
+VideoFrameTag::VideoFrameTag(RECORDHEADER h, istream &in, RootMovieClip* root) : DisplayListTag(h)
 {
 	in >> StreamID >> FrameNum;
 	framedata=nullptr;
@@ -2780,22 +2941,17 @@ VideoFrameTag::VideoFrameTag(RECORDHEADER h, istream &in):DisplayListTag(h)
 		framedata = new uint8_t[numbytes+AV_INPUT_BUFFER_PADDING_SIZE];
 		memset(framedata+numbytes,0,AV_INPUT_BUFFER_PADDING_SIZE);
 		in.read((char*)framedata,numbytes);
+
+		DefineVideoStreamTag* videotag=dynamic_cast<DefineVideoStreamTag*>(root->dictionaryLookup(StreamID));
+		if (videotag)
+			videotag->setFrameData(this);
+		else
+			LOG(LOG_ERROR,"VideoFrameTag: no corresponding video found "<<StreamID);
 	}
 }
 
-VideoFrameTag::~VideoFrameTag() 
+VideoFrameTag::~VideoFrameTag()
 {
 	if (framedata)
 		delete[] framedata;
-}
-
-void VideoFrameTag::execute(DisplayObjectContainer *parent, bool inskipping)
-{
-	DefineVideoStreamTag* videotag=dynamic_cast<DefineVideoStreamTag*>(parent->loadedFrom->dictionaryLookup(StreamID));
-	if (videotag)
-	{
-		videotag->setFrameData(this);
-	}
-	else
-		LOG(LOG_ERROR,"VideoFrameTag: no corresponding video found "<<StreamID);
 }

@@ -103,8 +103,12 @@ VideoDecoder::VideoDecoder():frameRate(0),framesdecoded(0),framesdropped(0),fram
 
 VideoDecoder::~VideoDecoder()
 {
-	if (videoTexture.isValid())
-		getSys()->getRenderThread()->releaseTexture(getTexture());
+	if(videoTexture.isValid())
+	{
+		RenderThread *rt=getSys()->getRenderThread();
+		if(rt)
+			rt->releaseTexture(getTexture());
+	}
 }
 
 void VideoDecoder::waitForFencing()
@@ -134,12 +138,15 @@ bool FFMpegVideoDecoder::fillDataAndCheckValidity()
 }
 
 FFMpegVideoDecoder::FFMpegVideoDecoder(LS_VIDEO_CODEC codecId, uint8_t* initdata, uint32_t datalen, double frameRateHint, DefineVideoStreamTag *tag):
-	ownedContext(true),curBuffer(0),codecContext(nullptr),curBufferOffset(0),currentcachedframe(UINT32_MAX),embeddedvideotag(tag)
+	ownedContext(true),curBuffer(0),codecContext(nullptr),curBufferOffset(0),embeddedvideotag(tag)
 {
 	//The tag is the header, initialize decoding
 	switchCodec(codecId, initdata, datalen, frameRateHint);
-
 	frameIn=av_frame_alloc();
+	// immediately decode 1 frame to obtain size:
+	// 'define stream' tag information not always correct + cannot resize during an 'upload' call
+	VideoFrameTag* t = tag->getFrame(0);
+	decodeData(t->getData(), t->getNumBytes(), UINT32_MAX);
 }
 
 void FFMpegVideoDecoder::switchCodec(LS_VIDEO_CODEC codecId, uint8_t *initdata, uint32_t datalen, double frameRateHint)
@@ -151,25 +158,23 @@ void FFMpegVideoDecoder::switchCodec(LS_VIDEO_CODEC codecId, uint8_t *initdata, 
 			av_free(codecContext);
 	}
 #ifdef HAVE_AVCODEC_ALLOC_CONTEXT3
-	codecContext=avcodec_alloc_context3(NULL);
+	codecContext=avcodec_alloc_context3(nullptr);
 #else
 	codecContext=avcodec_alloc_context();
 #endif //HAVE_AVCODEC_ALLOC_CONTEXT3
-	AVCodec* codec=NULL;
+	const AVCodec* codec=nullptr;
 	videoCodec=codecId;
 	if(codecId==H264)
 	{
 		//TODO: serialize access to avcodec_open
-		const enum CodecID FFMPEGcodecId=CODEC_ID_H264;
-		codec=avcodec_find_decoder(FFMPEGcodecId);
+		codec=avcodec_find_decoder(CODEC_ID_H264);
 		assert(codec);
 		//Ignore the frameRateHint as the rate is gathered from the video data
 	}
 	else if(codecId==H263)
 	{
 		//TODO: serialize access to avcodec_open
-		const enum CodecID FFMPEGcodecId=CODEC_ID_FLV1;
-		codec=avcodec_find_decoder(FFMPEGcodecId);
+		codec=avcodec_find_decoder(CODEC_ID_FLV1);
 		assert(codec);
 
 		//Exploit the frame rate information
@@ -179,8 +184,7 @@ void FFMpegVideoDecoder::switchCodec(LS_VIDEO_CODEC codecId, uint8_t *initdata, 
 	else if(codecId==VP6)
 	{
 		//TODO: serialize access to avcodec_open
-		const enum CodecID FFMPEGcodecId=CODEC_ID_VP6F;
-		codec=avcodec_find_decoder(FFMPEGcodecId);
+		codec=avcodec_find_decoder(CODEC_ID_VP6F);
 		assert(codec);
 
 		//Exploit the frame rate information
@@ -190,8 +194,7 @@ void FFMpegVideoDecoder::switchCodec(LS_VIDEO_CODEC codecId, uint8_t *initdata, 
 	else if(codecId==VP6A)
 	{
 		//TODO: serialize access to avcodec_open
-		const enum CodecID FFMPEGcodecId=CODEC_ID_VP6A;
-		codec=avcodec_find_decoder(FFMPEGcodecId);
+		codec=avcodec_find_decoder(CODEC_ID_VP6A);
 		assert(codec);
 
 		//Exploit the frame rate information
@@ -204,7 +207,7 @@ void FFMpegVideoDecoder::switchCodec(LS_VIDEO_CODEC codecId, uint8_t *initdata, 
 		codecContext->extradata_size=datalen;
 	}
 #ifdef HAVE_AVCODEC_OPEN2
-	if(avcodec_open2(codecContext, codec, NULL)<0)
+	if(avcodec_open2(codecContext, codec, nullptr)<0)
 #else
 	if(avcodec_open(codecContext, codec)<0)
 #endif //HAVE_AVCODEC_ALLOC_CONTEXT3
@@ -217,7 +220,7 @@ void FFMpegVideoDecoder::switchCodec(LS_VIDEO_CODEC codecId, uint8_t *initdata, 
 }
 #if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(57, 40, 101)
 FFMpegVideoDecoder::FFMpegVideoDecoder(AVCodecParameters* codecPar, double frameRateHint):
-	ownedContext(true),curBuffer(0),codecContext(NULL),curBufferOffset(0),currentcachedframe(UINT32_MAX),embeddedvideotag(nullptr)
+	ownedContext(true),curBuffer(0),codecContext(NULL),curBufferOffset(0),embeddedvideotag(nullptr)
 {
 	status=INIT;
 #ifdef HAVE_AVCODEC_ALLOC_CONTEXT3
@@ -242,9 +245,9 @@ FFMpegVideoDecoder::FFMpegVideoDecoder(AVCodecParameters* codecPar, double frame
 			return;
 	}
 	avcodec_parameters_to_context(codecContext,codecPar);
-	AVCodec* codec=avcodec_find_decoder(codecPar->codec_id);
+	const AVCodec* codec=avcodec_find_decoder(codecPar->codec_id);
 #ifdef HAVE_AVCODEC_OPEN2
-	if(avcodec_open2(codecContext, codec, NULL)<0)
+	if(avcodec_open2(codecContext, codec, nullptr)<0)
 #else
 	if(avcodec_open(codecContext, codec)<0)
 #endif //HAVE_AVCODEC_ALLOC_CONTEXT3
@@ -258,7 +261,7 @@ FFMpegVideoDecoder::FFMpegVideoDecoder(AVCodecParameters* codecPar, double frame
 }
 #else
 FFMpegVideoDecoder::FFMpegVideoDecoder(AVCodecContext* _c, double frameRateHint):
-	ownedContext(false),curBuffer(0),codecContext(_c),curBufferOffset(0),currentcachedframe(UINT32_MAX),embeddedvideotag(nullptr)
+	ownedContext(false),curBuffer(0),codecContext(_c),curBufferOffset(0),embeddedvideotag(nullptr)
 {
 	frameIn=av_frame_alloc();
 	status=INIT;
@@ -277,7 +280,7 @@ FFMpegVideoDecoder::FFMpegVideoDecoder(AVCodecContext* _c, double frameRateHint)
 		default:
 			return;
 	}
-	AVCodec* codec=avcodec_find_decoder(codecContext->codec_id);
+	const AVCodec* codec=avcodec_find_decoder(codecContext->codec_id);
 #ifdef HAVE_AVCODEC_OPEN2
 	if(avcodec_open2(codecContext, codec, NULL)<0)
 #else
@@ -392,11 +395,12 @@ bool FFMpegVideoDecoder::decodeData(uint8_t* data, uint32_t datalen, uint32_t ti
 	if(datalen==0)
 		return false;
 #if defined HAVE_AVCODEC_SEND_PACKET && defined HAVE_AVCODEC_RECEIVE_FRAME
-	AVPacket pkt;
-	av_init_packet(&pkt);
-	pkt.data=data;
-	pkt.size=datalen;
-	int ret = avcodec_send_packet(codecContext, &pkt);
+	AVPacket* pkt = av_packet_alloc();
+	if (!pkt)
+		return 0;
+	pkt->data=data;
+	pkt->size=datalen;
+	int ret = avcodec_send_packet(codecContext, pkt);
 	while (ret == 0)
 	{
 		ret = avcodec_receive_frame(codecContext,frameIn);
@@ -406,9 +410,9 @@ bool FFMpegVideoDecoder::decodeData(uint8_t* data, uint32_t datalen, uint32_t ti
 			{
 				LOG(LOG_INFO,"not decoded:"<<ret);
 #ifdef HAVE_AV_PACKET_UNREF
-				av_packet_unref(&pkt);
+				av_packet_unref(pkt);
 #else
-				av_free_packet(&pkt);
+				av_free_packet(pkt);
 #endif
 				return false;
 			}
@@ -424,10 +428,11 @@ bool FFMpegVideoDecoder::decodeData(uint8_t* data, uint32_t datalen, uint32_t ti
 		}
 	}
 #ifdef HAVE_AV_PACKET_UNREF
-	av_packet_unref(&pkt);
+	av_packet_unref(pkt);
 #else
-	av_free_packet(&pkt);
+	av_free_packet(pkt);
 #endif
+	av_packet_free(&pkt);
 #else
 	int frameOk=0;
 #if HAVE_AVCODEC_DECODE_VIDEO2
@@ -559,30 +564,30 @@ void FFMpegVideoDecoder::upload(uint8_t* data, uint32_t w, uint32_t h)
 	assert_and_throw(w==((frameWidth+15)&0xfffffff0) && h==frameHeight);
 	if (embeddedvideotag) // on embedded video we decode the frames during upload
 	{
-		if (currentframe != UINT32_MAX)
+		if (currentframe < lastframe)
 		{
-			skipAll();
-			for (uint32_t i = lastframe+1; i <currentframe; i++)
-			{
-				VideoFrameTag* t = embeddedvideotag->getFrame(i);
-				if (t)
-					decodeData(t->getData(),t->getNumBytes(),UINT32_MAX);
-			}
-			decodeData(embeddedvideotag->getFrame(currentframe)->getData(),embeddedvideotag->getFrame(currentframe)->getNumBytes(), 0);
-			lastframe=currentframe;
+			currentframe = 0;
+			lastframe = UINT32_MAX;
 		}
-		else
-			currentframe=0;
+
+		skipAll();
+		for (uint32_t i = lastframe+1; i <= currentframe; i++)
+		{
+			VideoFrameTag* t = embeddedvideotag->getFrame(i);
+			if (!t)
+				return;
+			decodeData(t->getData(), t->getNumBytes(), (i == currentframe) ? 0 : UINT32_MAX);
+			lastframe = i;
+		}
 		if(embeddedbuffers.isEmpty())
 			return;
-
 	}
 	else
 	{
 		if(streamingbuffers.isEmpty())
 			return;
 	}
-	
+
 	//At least a frame is available
 	YUVBuffer* cur=embeddedvideotag ? &embeddedbuffers.front() : &streamingbuffers.front();
 	fastYUV420ChannelsToYUV0Buffer(cur->ch[0],cur->ch[1],cur->ch[2],data,frameWidth,frameHeight);
@@ -731,11 +736,11 @@ void FFMpegAudioDecoder::switchCodec(LS_AUDIO_CODEC audioCodec, uint8_t* initdat
 	if (resamplecontext)
 		avresample_free(&resamplecontext);
 #endif
-	AVCodec* codec=avcodec_find_decoder(LSToFFMpegCodec(audioCodec));
+	const AVCodec* codec=avcodec_find_decoder(LSToFFMpegCodec(audioCodec));
 	assert(codec);
 
 #ifdef HAVE_AVCODEC_ALLOC_CONTEXT3
-	codecContext=avcodec_alloc_context3(NULL);
+	codecContext=avcodec_alloc_context3(nullptr);
 #else
 	codecContext=avcodec_alloc_context();
 #endif //HAVE_AVCODEC_ALLOC_CONTEXT3
@@ -747,7 +752,7 @@ void FFMpegAudioDecoder::switchCodec(LS_AUDIO_CODEC audioCodec, uint8_t* initdat
 	}
 
 #ifdef HAVE_AVCODEC_OPEN2
-	if(avcodec_open2(codecContext, codec, NULL)<0)
+	if(avcodec_open2(codecContext, codec, nullptr)<0)
 #else
 	if(avcodec_open(codecContext, codec)<0)
 #endif //HAVE_AVCODEC_ALLOC_CONTEXT3
@@ -761,13 +766,13 @@ void FFMpegAudioDecoder::switchCodec(LS_AUDIO_CODEC audioCodec, uint8_t* initdat
 
 FFMpegAudioDecoder::FFMpegAudioDecoder(EngineData* eng,LS_AUDIO_CODEC lscodec, int sampleRate, int channels, bool):engine(eng),ownedContext(true)
 #if defined HAVE_LIBAVRESAMPLE || defined HAVE_LIBSWRESAMPLE
-	,resamplecontext(NULL)
+	,resamplecontext(nullptr)
 #endif
 {
 	status=INIT;
 
 	CodecID codecId = LSToFFMpegCodec(lscodec);
-	AVCodec* codec=avcodec_find_decoder(codecId);
+	const AVCodec* codec=avcodec_find_decoder(codecId);
 	assert(codec);
 	codecContext=avcodec_alloc_context3(codec);
 	codecContext->codec_id = codecId;
@@ -806,7 +811,7 @@ FFMpegAudioDecoder::FFMpegAudioDecoder(EngineData* eng,AVCodecParameters* codecP
 #endif
 {
 	status=INIT;
-	AVCodec* codec=avcodec_find_decoder(codecPar->codec_id);
+	const AVCodec* codec=avcodec_find_decoder(codecPar->codec_id);
 	assert(codec);
 #ifdef HAVE_AVCODEC_ALLOC_CONTEXT3
 	codecContext=avcodec_alloc_context3(NULL);
@@ -835,7 +840,7 @@ FFMpegAudioDecoder::FFMpegAudioDecoder(EngineData* eng,AVCodecContext* _c):engin
 #endif
 {
 	status=INIT;
-	AVCodec* codec=avcodec_find_decoder(codecContext->codec_id);
+	const AVCodec* codec=avcodec_find_decoder(codecContext->codec_id);
 	assert(codec);
 
 #ifdef HAVE_AVCODEC_OPEN2
@@ -922,28 +927,29 @@ bool FFMpegAudioDecoder::fillDataAndCheckValidity()
 uint32_t FFMpegAudioDecoder::decodeData(uint8_t* data, int32_t datalen, uint32_t time)
 {
 #if defined HAVE_AVCODEC_SEND_PACKET && defined HAVE_AVCODEC_RECEIVE_FRAME
-	AVPacket pkt;
-	av_init_packet(&pkt);
+	AVPacket* pkt = av_packet_alloc();
+	if (!pkt)
+		return 0;
 
 	// If some data was left unprocessed on previous call,
 	// concatenate.
 	std::vector<uint8_t> combinedBuffer;
 	if (overflowBuffer.empty())
 	{
-		pkt.data=data;
-		pkt.size=datalen;
+		pkt->data=data;
+		pkt->size=datalen;
 	}
 	else
 	{
 		combinedBuffer.assign(overflowBuffer.begin(), overflowBuffer.end());
 		if (datalen > 0)
 			combinedBuffer.insert(combinedBuffer.end(), data, data+datalen);
-		pkt.data = &combinedBuffer[0];
-		pkt.size = combinedBuffer.size();
+		pkt->data = &combinedBuffer[0];
+		pkt->size = combinedBuffer.size();
 		overflowBuffer.clear();
 	}
 	av_frame_unref(frameIn);
-	int ret = avcodec_send_packet(codecContext, &pkt);
+	int ret = avcodec_send_packet(codecContext, pkt);
 	int maxLen = 0;
 	while (ret == 0)
 	{
@@ -960,9 +966,9 @@ uint32_t FFMpegAudioDecoder::decodeData(uint8_t* data, int32_t datalen, uint32_t
 			FrameSamples& curTail=samplesBuffer.acquireLast();
 			int len = resampleFrameToS16(curTail);
 #if ( LIBAVUTIL_VERSION_INT < AV_VERSION_INT(56,0,100) )
-			maxLen = pkt.size - av_frame_get_pkt_size (frameIn);
+			maxLen = pkt->size - av_frame_get_pkt_size (frameIn);
 #else
-			maxLen = pkt.size - frameIn->pkt_size;
+			maxLen = pkt->size - frameIn->pkt_size;
 #endif
 			curTail.len=len;
 			assert(!(curTail.len&0x80000000));
@@ -976,8 +982,8 @@ uint32_t FFMpegAudioDecoder::decodeData(uint8_t* data, int32_t datalen, uint32_t
 	}
 	if (maxLen > 0)
 	{
-		int tmpsize = pkt.size - maxLen;
-		uint8_t* tmpdata = pkt.data;
+		int tmpsize = pkt->size - maxLen;
+		uint8_t* tmpdata = pkt->data;
 		tmpdata += maxLen;
 
 		if (tmpsize > 0)
@@ -986,10 +992,11 @@ uint32_t FFMpegAudioDecoder::decodeData(uint8_t* data, int32_t datalen, uint32_t
 		}
 	}
 #ifdef HAVE_AV_PACKET_UNREF
-	av_packet_unref(&pkt);
+	av_packet_unref(pkt);
 #else
-	av_free_packet(&pkt);
+	av_free_packet(pkt);
 #endif
+	av_packet_free(&pkt);
 	return maxLen;
 #else
 	FrameSamples& curTail=samplesBuffer.acquireLast();
@@ -1266,7 +1273,11 @@ FFMpegStreamDecoder::FFMpegStreamDecoder(NetStream *ns, EngineData *eng, std::is
 	avioContext->is_streamed=1;
 #endif
 
-	AVInputFormat* fmt = NULL;
+#if LIBAVFORMAT_VERSION_MAJOR > 58
+	const AVInputFormat* fmt = nullptr;
+#else
+	AVInputFormat* fmt = nullptr;
+#endif
 	if (format)
 	{
 		switch (format->codec)
@@ -1291,7 +1302,7 @@ FFMpegStreamDecoder::FFMpegStreamDecoder(NetStream *ns, EngineData *eng, std::is
 				break;
 		}
 	}
-	if (fmt == NULL)
+	if (fmt == nullptr)
 	{
 		//Probe the stream format.
 		//NOTE: in FFMpeg 0.7 there is av_probe_input_buffer
@@ -1312,15 +1323,15 @@ FFMpegStreamDecoder::FFMpegStreamDecoder(NetStream *ns, EngineData *eng, std::is
 		fmt=av_probe_input_format(&probeData,1);
 		delete[] probeData.buf;
 	}
-	if(fmt==NULL)
+	if(fmt==nullptr)
 		return;
 
 #ifdef HAVE_AVIO_ALLOC_CONTEXT
 	formatCtx=avformat_alloc_context();
 	formatCtx->pb = avioContext;
-	int ret=avformat_open_input(&formatCtx, "lightspark_stream", fmt, NULL);
+	int ret=avformat_open_input(&formatCtx, "lightspark_stream", fmt, nullptr);
 #else
-	int ret=av_open_input_stream(&formatCtx, avioContext, "lightspark_stream", fmt, NULL);
+	int ret=av_open_input_stream(&formatCtx, avioContext, "lightspark_stream", fmt, nullptr);
 #endif
 	if(ret<0)
 		return;

@@ -1,0 +1,336 @@
+Determining if the function avcodec_decode_video2 exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_87ae4/fast && /usr/bin/make -f CMakeFiles/cmTC_87ae4.dir/build.make CMakeFiles/cmTC_87ae4.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_87ae4.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_87ae4.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_decode_video2   -o CMakeFiles/cmTC_87ae4.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_87ae4.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_87ae4.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_decode_video2   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_87ae4.dir/objects1.rsp  -o cmTC_87ae4.js @CMakeFiles/cmTC_87ae4.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_87ae4.wasm CMakeFiles/cmTC_87ae4.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_87ae4.dir/build.make:90: cmTC_87ae4.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_87ae4/fast] Error 2
+
+
+
+Determining if the function avcodec_decode_audio3 exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_8240b/fast && /usr/bin/make -f CMakeFiles/cmTC_8240b.dir/build.make CMakeFiles/cmTC_8240b.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_8240b.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_8240b.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_decode_audio3   -o CMakeFiles/cmTC_8240b.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_8240b.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_8240b.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_decode_audio3   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_8240b.dir/objects1.rsp  -o cmTC_8240b.js @CMakeFiles/cmTC_8240b.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_8240b.wasm CMakeFiles/cmTC_8240b.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_8240b.dir/build.make:90: cmTC_8240b.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_8240b/fast] Error 2
+
+
+
+Determining if the function avcodec_decode_audio4 exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_96df8/fast && /usr/bin/make -f CMakeFiles/cmTC_96df8.dir/build.make CMakeFiles/cmTC_96df8.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_96df8.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_96df8.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_decode_audio4   -o CMakeFiles/cmTC_96df8.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_96df8.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_96df8.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_decode_audio4   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_96df8.dir/objects1.rsp  -o cmTC_96df8.js @CMakeFiles/cmTC_96df8.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_96df8.wasm CMakeFiles/cmTC_96df8.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_96df8.dir/build.make:90: cmTC_96df8.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_96df8/fast] Error 2
+
+
+
+Determining if the function avio_alloc_context exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_7cddc/fast && /usr/bin/make -f CMakeFiles/cmTC_7cddc.dir/build.make CMakeFiles/cmTC_7cddc.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_7cddc.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_7cddc.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avio_alloc_context   -o CMakeFiles/cmTC_7cddc.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_7cddc.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_7cddc.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avio_alloc_context   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_7cddc.dir/objects1.rsp  -o cmTC_7cddc.js @CMakeFiles/cmTC_7cddc.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_7cddc.wasm CMakeFiles/cmTC_7cddc.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_7cddc.dir/build.make:90: cmTC_7cddc.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_7cddc/fast] Error 2
+
+
+
+Determining if the function avcodec_alloc_context3 exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_3a2f3/fast && /usr/bin/make -f CMakeFiles/cmTC_3a2f3.dir/build.make CMakeFiles/cmTC_3a2f3.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_3a2f3.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_3a2f3.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_alloc_context3   -o CMakeFiles/cmTC_3a2f3.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_3a2f3.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3a2f3.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_alloc_context3   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_3a2f3.dir/objects1.rsp  -o cmTC_3a2f3.js @CMakeFiles/cmTC_3a2f3.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_3a2f3.wasm CMakeFiles/cmTC_3a2f3.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__dl_seterr --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_3a2f3.dir/build.make:90: cmTC_3a2f3.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_3a2f3/fast] Error 2
+
+
+
+Determining if the function avcodec_open2 exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_b79f5/fast && /usr/bin/make -f CMakeFiles/cmTC_b79f5.dir/build.make CMakeFiles/cmTC_b79f5.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_b79f5.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_b79f5.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_open2   -o CMakeFiles/cmTC_b79f5.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_b79f5.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_b79f5.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_open2   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_b79f5.dir/objects1.rsp  -o cmTC_b79f5.js @CMakeFiles/cmTC_b79f5.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_b79f5.wasm CMakeFiles/cmTC_b79f5.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_b79f5.dir/build.make:90: cmTC_b79f5.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_b79f5/fast] Error 2
+
+
+
+Determining if the function avformat_close_input exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_ae968/fast && /usr/bin/make -f CMakeFiles/cmTC_ae968.dir/build.make CMakeFiles/cmTC_ae968.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_ae968.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_ae968.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avformat_close_input   -o CMakeFiles/cmTC_ae968.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_ae968.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_ae968.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avformat_close_input   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_ae968.dir/objects1.rsp  -o cmTC_ae968.js @CMakeFiles/cmTC_ae968.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_ae968.wasm CMakeFiles/cmTC_ae968.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__dl_seterr --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_ae968.dir/build.make:90: cmTC_ae968.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_ae968/fast] Error 2
+
+
+
+Determining if the function avformat_find_stream_info exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_38bbd/fast && /usr/bin/make -f CMakeFiles/cmTC_38bbd.dir/build.make CMakeFiles/cmTC_38bbd.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_38bbd.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_38bbd.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avformat_find_stream_info   -o CMakeFiles/cmTC_38bbd.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_38bbd.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_38bbd.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avformat_find_stream_info   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_38bbd.dir/objects1.rsp  -o cmTC_38bbd.js @CMakeFiles/cmTC_38bbd.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_38bbd.wasm CMakeFiles/cmTC_38bbd.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__dl_seterr --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_38bbd.dir/build.make:90: cmTC_38bbd.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_38bbd/fast] Error 2
+
+
+
+Determining if the function av_frame_alloc exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_97dba/fast && /usr/bin/make -f CMakeFiles/cmTC_97dba.dir/build.make CMakeFiles/cmTC_97dba.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_97dba.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_97dba.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=av_frame_alloc   -o CMakeFiles/cmTC_97dba.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_97dba.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_97dba.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=av_frame_alloc   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_97dba.dir/objects1.rsp  -o cmTC_97dba.js @CMakeFiles/cmTC_97dba.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_97dba.wasm CMakeFiles/cmTC_97dba.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_97dba.dir/build.make:90: cmTC_97dba.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_97dba/fast] Error 2
+
+
+
+Determining if the function av_frame_unref exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_2c5ee/fast && /usr/bin/make -f CMakeFiles/cmTC_2c5ee.dir/build.make CMakeFiles/cmTC_2c5ee.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_2c5ee.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_2c5ee.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=av_frame_unref   -o CMakeFiles/cmTC_2c5ee.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_2c5ee.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_2c5ee.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=av_frame_unref   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_2c5ee.dir/objects1.rsp  -o cmTC_2c5ee.js @CMakeFiles/cmTC_2c5ee.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_2c5ee.wasm CMakeFiles/cmTC_2c5ee.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__dl_seterr --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_2c5ee.dir/build.make:90: cmTC_2c5ee.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_2c5ee/fast] Error 2
+
+
+
+Determining if the function av_packet_unref exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_efb4b/fast && /usr/bin/make -f CMakeFiles/cmTC_efb4b.dir/build.make CMakeFiles/cmTC_efb4b.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_efb4b.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_efb4b.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=av_packet_unref   -o CMakeFiles/cmTC_efb4b.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_efb4b.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_efb4b.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=av_packet_unref   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_efb4b.dir/objects1.rsp  -o cmTC_efb4b.js @CMakeFiles/cmTC_efb4b.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_efb4b.wasm CMakeFiles/cmTC_efb4b.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__dl_seterr --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_efb4b.dir/build.make:90: cmTC_efb4b.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_efb4b/fast] Error 2
+
+
+
+Determining if the function avcodec_send_packet exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_069f4/fast && /usr/bin/make -f CMakeFiles/cmTC_069f4.dir/build.make CMakeFiles/cmTC_069f4.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_069f4.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_069f4.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_send_packet   -o CMakeFiles/cmTC_069f4.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_069f4.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_069f4.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_send_packet   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_069f4.dir/objects1.rsp  -o cmTC_069f4.js @CMakeFiles/cmTC_069f4.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_069f4.wasm CMakeFiles/cmTC_069f4.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_069f4.dir/build.make:90: cmTC_069f4.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_069f4/fast] Error 2
+
+
+
+Determining if the function avcodec_receive_frame exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_3311e/fast && /usr/bin/make -f CMakeFiles/cmTC_3311e.dir/build.make CMakeFiles/cmTC_3311e.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_3311e.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_3311e.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_receive_frame   -o CMakeFiles/cmTC_3311e.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_3311e.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3311e.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=avcodec_receive_frame   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_3311e.dir/objects1.rsp  -o cmTC_3311e.js @CMakeFiles/cmTC_3311e.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_3311e.wasm CMakeFiles/cmTC_3311e.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_3311e.dir/build.make:90: cmTC_3311e.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_3311e/fast] Error 2
+
+
+
+Determining if the function av_frame_get_sample_rate exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_78ef4/fast && /usr/bin/make -f CMakeFiles/cmTC_78ef4.dir/build.make CMakeFiles/cmTC_78ef4.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_78ef4.dir/CheckFunctionExists.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_78ef4.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=av_frame_get_sample_rate   -o CMakeFiles/cmTC_78ef4.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_78ef4.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_78ef4.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/emcc  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DCHECK_FUNCTION_EXISTS=av_frame_get_sample_rate   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_78ef4.dir/objects1.rsp  -o cmTC_78ef4.js @CMakeFiles/cmTC_78ef4.dir/linklibs.rsp
+wasm-ld: error: unable to find library -lavcodec
+wasm-ld: error: unable to find library -lavutil
+wasm-ld: error: unable to find library -lavformat
+wasm-ld: error: unable to find library -lswresample
+emcc: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_78ef4.wasm CMakeFiles/cmTC_78ef4.dir/CheckFunctionExists.c.o -lavcodec -lavutil -lavformat -lswresample -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__dl_seterr --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_78ef4.dir/build.make:90: cmTC_78ef4.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_78ef4/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test HAVE_AVCODECID failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_50de4/fast && /usr/bin/make -f CMakeFiles/cmTC_50de4.dir/build.make CMakeFiles/cmTC_50de4.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_50de4.dir/src.c.o
+/home/huw/emsdk/upstream/emscripten/emcc  @CMakeFiles/cmTC_50de4.dir/includes_C.rsp -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -DHAVE_AVCODECID   -o CMakeFiles/cmTC_50de4.dir/src.c.o   -c /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp/src.c
+In file included from /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp/src.c:1:
+In file included from /usr/include/x86_64-linux-gnu/libavcodec/avcodec.h:30:
+In file included from /home/huw/emsdk/upstream/emscripten/cache/sysroot/include/errno.h:10:
+/usr/include/x86_64-linux-gnu/bits/errno.h:26:11: fatal error: 'linux/errno.h' file not found
+# include <linux/errno.h>
+          ^~~~~~~~~~~~~~~
+1 error generated.
+emcc: error: '/home/huw/emsdk/upstream/bin/clang -target wasm32-unknown-emscripten -DEMSCRIPTEN -fignore-exceptions -fvisibility=default -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr -D__EMSCRIPTEN_major__=3 -D__EMSCRIPTEN_minor__=0 -D__EMSCRIPTEN_tiny__=0 -D_LIBCPP_ABI_VERSION=2 -Werror=implicit-function-declaration -I/home/huw/emsdk/upstream/emscripten/cache/sysroot/include/freetype2/freetype -Xclang -isystem/home/huw/emsdk/upstream/emscripten/cache/sysroot/include/SDL2 --sysroot=/home/huw/emsdk/upstream/emscripten/cache/sysroot -Xclang -iwithsysroot/include/compat -I/usr/include/x86_64-linux-gnu -DHAVE_AVCODECID -c /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp/src.c -o CMakeFiles/cmTC_50de4.dir/src.c.o' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_50de4.dir/build.make:67: CMakeFiles/cmTC_50de4.dir/src.c.o] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_50de4/fast] Error 2
+
+
+Source file was:
+#include <libavcodec/avcodec.h>
+int main() { enum AVCodecID c; return 0; }
+Determining if the include file atomic exists failed with the following output:
+Change Dir: /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_cb5ee/fast && /usr/bin/make -f CMakeFiles/cmTC_cb5ee.dir/build.make CMakeFiles/cmTC_cb5ee.dir/build
+make[1]: Entering directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_cb5ee.dir/CheckIncludeFile.cxx.o
+/home/huw/emsdk/upstream/emscripten/em++    -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -Wall -Wnon-virtual-dtor -Woverloaded-virtual -Wno-undefined-var-template -pipe -fvisibility=hidden -fvisibility-inlines-hidden -std=c++11 -Wdisabled-optimization -Wextra -Wno-unused-parameter -Wno-invalid-offsetof    -o CMakeFiles/cmTC_cb5ee.dir/CheckIncludeFile.cxx.o -c /home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp/CheckIncludeFile.cxx
+Linking CXX executable cmTC_cb5ee.js
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cb5ee.dir/link.txt --verbose=1
+/home/huw/emsdk/upstream/emscripten/em++   -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1 -Wall -Wnon-virtual-dtor -Woverloaded-virtual -Wno-undefined-var-template -pipe -fvisibility=hidden -fvisibility-inlines-hidden -std=c++11 -Wdisabled-optimization -Wextra -Wno-unused-parameter -Wno-invalid-offsetof   -Wl,--as-needed -Wl,--no-undefined  -s USE_SDL=2 -s USE_FREETYPE=1 -s USE_ZLIB=1 -s USE_LIBJPEG=1 -s USE_LIBPNG=1  @CMakeFiles/cmTC_cb5ee.dir/objects1.rsp  -o cmTC_cb5ee.js 
+wasm-ld: error: unknown argument: --as-needed
+wasm-ld: error: unknown argument: --no-undefined
+em++: error: '/home/huw/emsdk/upstream/bin/wasm-ld -o cmTC_cb5ee.wasm --as-needed --no-undefined CMakeFiles/cmTC_cb5ee.dir/CheckIncludeFile.cxx.o -L/home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libSDL2.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libjpeg.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libfreetype.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libpng.a /home/huw/emsdk/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libz.a -lGL -lal -lhtml5 -lstubs-debug -lc -lcompiler_rt -lc++-noexcept -lc++abi-noexcept -ldlmalloc -lc_rt -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr --import-undefined --strip-debug --export-if-defined=main --export-if-defined=emscripten_stack_get_end --export-if-defined=emscripten_stack_get_free --export-if-defined=emscripten_stack_init --export-if-defined=stackSave --export-if-defined=stackRestore --export-if-defined=stackAlloc --export-if-defined=__wasm_call_ctors --export-if-defined=fflush --export-if-defined=__errno_location --export-if-defined=malloc --export-if-defined=free --export-if-defined=__dl_seterr --export-if-defined=saveSetjmp --export-if-defined=setThrew --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-table -z stack-size=5242880 --initial-memory=16777216 --no-entry --max-memory=16777216 --global-base=1024' failed (returned 1)
+make[1]: *** [CMakeFiles/cmTC_cb5ee.dir/build.make:88: cmTC_cb5ee.js] Error 1
+make[1]: Leaving directory '/home/huw/projects/lightspark-wasm/obj-wasm/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_cb5ee/fast] Error 2
+
+
+

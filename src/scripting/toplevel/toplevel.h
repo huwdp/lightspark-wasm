@@ -78,11 +78,11 @@ public:
 	 * then an exception is thrown.
 	 * The caller does not own the object returned.
 	 */
-	static const Type* getTypeFromMultiname(const multiname* mn, ABCContext* context);
+	static const Type* getTypeFromMultiname(multiname* mn, ABCContext* context);
 	/*
 	 * Checks if the type is already in sys->classes
 	 */
-	static const Type *getBuiltinType(SystemState* sys, const multiname* mn);
+	static const Type *getBuiltinType(SystemState* sys, multiname* mn);
 	/*
 	 * Converts the given object to an object of this type.
 	 * If the argument cannot be converted, it throws a TypeError
@@ -103,6 +103,9 @@ public:
 
 	/* returns true if this type is a builtin type, false for classes defined in the swf file */
 	virtual bool isBuiltin() const = 0;
+	
+	/* returns the Global object this type is associated to */
+	virtual Global* getGlobalScope() const = 0;
 };
 template<> inline Type* ASObject::as<Type>() { return dynamic_cast<Type*>(this); }
 template<> inline const Type* ASObject::as<Type>() const { return dynamic_cast<const Type*>(this); }
@@ -113,10 +116,11 @@ public:
 	bool coerce(SystemState* sys,asAtom& o) const override { return false; }
 	void coerceForTemplate(SystemState* sys, asAtom& o) const override {}
 	virtual ~Any() {}
-	tiny_string getName() const { return "any"; }
+	tiny_string getName() const override { return "any"; }
 	EARLY_BIND_STATUS resolveMultinameStatically(const multiname& name) const override { return CANNOT_BIND; }
 	const multiname* resolveSlotTypeName(uint32_t slotId) const override { return nullptr; }
-	bool isBuiltin() const { return true; }
+	bool isBuiltin() const override { return true; }
+	Global* getGlobalScope() const override { return nullptr; }
 };
 
 class Void: public Type
@@ -128,7 +132,8 @@ public:
 	tiny_string getName() const override { return "void"; }
 	EARLY_BIND_STATUS resolveMultinameStatically(const multiname& name) const override { return NOT_BINDED; }
 	const multiname* resolveSlotTypeName(uint32_t slotId) const override { return nullptr; }
-	bool isBuiltin() const { return true; }
+	bool isBuiltin() const override { return true; }
+	Global* getGlobalScope() const override { return nullptr; }
 };
 
 /*
@@ -147,6 +152,7 @@ public:
 	EARLY_BIND_STATUS resolveMultinameStatically(const multiname& name) const override;
 	const multiname* resolveSlotTypeName(uint32_t slotId) const override;
 	bool isBuiltin() const override { return true; }
+	Global* getGlobalScope() const override { return nullptr; }
 };
 
 class Prototype;
@@ -160,6 +166,7 @@ template<class T> friend class Template;
 private:
 	mutable std::vector<multiname> interfaces;
 	mutable std::vector<Class_base*> interfaces_added;
+	std::unordered_set<uint32_t> overriddenmethods;
 	nsNameAndKind protected_ns;
 	void initializeProtectedNamespace(uint32_t nameId, const namespace_info& ns,RootMovieClip* root);
 	IFunction* constructor;
@@ -167,7 +174,9 @@ private:
 	void describeVariables(pugi::xml_node &root, const Class_base* c, std::map<tiny_string, pugi::xml_node *> &instanceNodes, const variables_map& map, bool isTemplate, bool forinstance) const;
 	void describeConstructor(pugi::xml_node &root) const;
 	virtual void describeClassMetadata(pugi::xml_node &root) const {}
+	uint32_t qualifiedClassnameID;
 protected:
+	Global* global;
 	void describeMetadata(pugi::xml_node &node, const traits_info& trait) const;
 	void copyBorrowedTraitsFromSuper();
 	ASFUNCTION_ATOM(_toString);
@@ -203,6 +212,7 @@ public:
 	void handleConstruction(asAtom &target, asAtom *args, unsigned int argslen, bool buildAndLink);
 	void setConstructor(IFunction* c);
 	bool hasConstructor() { return constructor != nullptr; }
+	IFunction* getConstructor() { return constructor; }
 	Class_base(const QName& name, MemoryAccount* m);
 	//Special constructor for Class_object
 	Class_base(const Class_object*);
@@ -217,11 +227,12 @@ public:
 	/*
 	 * Returns true when 'this' is a subclass of 'cls',
 	 * i.e. this == cls or cls equals some super of this.
-         * If considerInterfaces is true, check interfaces, too.
+	 * If considerInterfaces is true, check interfaces, too.
 	 */
 	bool isSubClass(const Class_base* cls, bool considerInterfaces=true) const;
-	tiny_string getQualifiedClassName(bool forDescribeType = false) const;
-	tiny_string getName() const;
+	const tiny_string getQualifiedClassName(bool forDescribeType = false) const;
+	uint32_t getQualifiedClassNameID();
+	tiny_string getName() const override;
 	tiny_string toString();
 	virtual void generator(asAtom &ret, asAtom* args, const unsigned int argslen);
 	ASObject *describeType() const override;
@@ -252,12 +263,22 @@ public:
 		return borrowedVariables.findObjVar(getSystemState(),name,NO_CREATE_TRAIT,DECLARED_TRAIT);
 	}
 	bool isBuiltin() const override { return true; }
+	Global* getGlobalScope() const override { return global; }
+	void setGlobalScope(Global* g) { global = g; }
 	bool implementsInterfaces() const { return interfaces.size() || interfaces_added.size(); }
 	bool isInterfaceMethod(const multiname &name);
 	void removeAllDeclaredProperties();
+	virtual bool hasoverriddenmethod(multiname* name) const
+	{
+		return overriddenmethods.find(name->name_s_id) != overriddenmethods.end();
+	}
+	void addoverriddenmethod(uint32_t nameID)
+	{
+		overriddenmethods.insert(nameID);
+	}
 };
 
-class Template_base : public ASObject
+class Template_base : public ASObject, public Type
 {
 private:
 	QName template_name;
@@ -267,6 +288,15 @@ public:
 	QName getTemplateName() { return template_name; }
 	ASPROPERTY_GETTER(_NR<Prototype>,prototype);
 	void addPrototypeGetter(SystemState *sys);
+
+
+	bool coerce(SystemState* sys, asAtom& o) const override	{ return false;}
+	void coerceForTemplate(SystemState* sys, asAtom& o) const override {}
+	tiny_string getName() const override { return "template"; }
+	EARLY_BIND_STATUS resolveMultinameStatically(const multiname& name) const override { return CANNOT_BIND;}
+	const multiname* resolveSlotTypeName(uint32_t slotId) const override { return nullptr; }
+	bool isBuiltin() const override { return true;}
+	Global* getGlobalScope() const override	{ return nullptr; }
 };
 
 class Class_object: public Class_base
@@ -285,7 +315,7 @@ private:
 	void finalize() override
 	{
 		//Remove the cyclic reference to itself
-		setClass(NULL);
+		setClass(nullptr);
 		Class_base::finalize();
 	}
 	
@@ -317,6 +347,8 @@ public:
 	 * This method is actually forwarded to the object. It's here as a shorthand.
 	 */
 	void setVariableByQName(const tiny_string& name, const tiny_string& ns, ASObject* o, TRAIT_KIND traitKind);
+	void setVariableByQName(const tiny_string& name, const nsNameAndKind& ns, ASObject* o, TRAIT_KIND traitKind);
+	void setVariableByQName(uint32_t nameID, const nsNameAndKind& ns, ASObject* o, TRAIT_KIND traitKind);
 	void setVariableAtomByQName(const tiny_string& name, const nsNameAndKind& ns, asAtom o, TRAIT_KIND traitKind);
 };
 
@@ -329,7 +361,7 @@ public:
 	ObjectPrototype(Class_base* c);
 	inline void finalize() override { prevPrototype.reset(); }
 	GET_VARIABLE_RESULT getVariableByMultiname(asAtom& ret, const multiname& name, GET_VARIABLE_OPTION opt=NONE) override;
-	multiname* setVariableByMultiname(const multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset=nullptr) override;
+	multiname* setVariableByMultiname(multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset=nullptr) override;
 	bool isEqual(ASObject* r) override;
 };
 
@@ -354,7 +386,7 @@ public:
 	ArrayPrototype(Class_base* c);
 	inline void finalize() override { prevPrototype.reset(); }
 	GET_VARIABLE_RESULT getVariableByMultiname(asAtom& ret, const multiname& name, GET_VARIABLE_OPTION opt=NONE) override;
-	multiname* setVariableByMultiname(const multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset=nullptr) override;
+	multiname* setVariableByMultiname(multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset=nullptr) override;
 	bool isEqual(ASObject* r) override;
 };
 
@@ -388,7 +420,7 @@ class Function_object: public ASObject
 public:
 	Function_object(Class_base* c, _R<ASObject> p);
 	_NR<ASObject> functionPrototype;
-	void finalize() { functionPrototype.reset(); }
+	void finalize() override { functionPrototype.reset(); }
 
 	GET_VARIABLE_RESULT getVariableByMultiname(asAtom& ret, const multiname& name, GET_VARIABLE_OPTION opt=NONE) override;
 };
@@ -415,7 +447,7 @@ public:
 	Class_base* inClass;
 	// if this is a class method, this indicates if it is a static or instance method
 	bool isStatic;
-	bool isCloned;
+	IFunction* clonedFrom;
 	/* returns whether this is this a method of a function */
 	bool isMethod() const { return inClass != nullptr; }
 	bool isConstructed() const override { return constructIndicator; }
@@ -423,7 +455,7 @@ public:
 	{
 		inClass=nullptr;
 		isStatic=false;
-		isCloned=false;
+		clonedFrom=nullptr;
 		functionname=0;
 		length=0;
 		closure_this.reset();
@@ -436,7 +468,7 @@ public:
 		ret=clone();
 		ret->setClass(getClass());
 		ret->closure_this=c;
-		ret->isCloned=true;
+		ret->clonedFrom=this;
 		ret->isStatic=isStatic;
 		ret->constructIndicator = true;
 		ret->constructorCallComplete = true;
@@ -448,11 +480,14 @@ public:
 	ASFUNCTION_ATOM(_toString);
 	ASPROPERTY_GETTER_SETTER(_NR<ASObject>,prototype);
 	virtual method_info* getMethodInfo() const=0;
-	virtual ASObject *describeType() const;
+	ASObject *describeType() const override;
 	uint32_t functionname;
 	virtual multiname* callGetter(asAtom& ret, ASObject* target) =0;
 	virtual Class_base* getReturnType() =0;
 	std::string toDebugString() override;
+	void serialize(ByteArray* out, std::map<tiny_string, uint32_t>& stringMap,
+				std::map<const ASObject*, uint32_t>& objMap,
+				std::map<const Class_base*, uint32_t>& traitsMap) override;
 };
 
 /*
@@ -494,6 +529,7 @@ protected:
 			ret->returnTypeAllArgsInt = returnTypeAllArgsInt;
 		}
 		ret->subtype = this->subtype;
+		ret->isStatic = this->isStatic;
 		return ret;
 	}
 	bool destruct() override
@@ -552,6 +588,7 @@ public:
 class SyntheticFunction : public IFunction
 {
 friend class ABCVm;
+friend class ABCContext;
 friend class Class<IFunction>;
 friend class Class_base;
 public:
@@ -564,6 +601,7 @@ private:
 	synt_function val;
 	/* Pointer to multiname, if this function is a simple getter or setter */
 	multiname* simpleGetterOrSetterName;
+	bool fromNewFunction;
 	SyntheticFunction(Class_base* c,method_info* m);
 protected:
 	IFunction* clone() override
@@ -582,8 +620,10 @@ protected:
 			ret->inClass = inClass;
 			ret->func_scope = func_scope;
 			ret->functionname = functionname;
+			ret->fromNewFunction = fromNewFunction;
 		}
 		ret->subtype = this->subtype;
+		ret->isStatic = this->isStatic;
 		ret->objfreelist = &getClass()->freelist[1];
 		return ret;
 	}
@@ -794,7 +834,7 @@ public:
 	void serialize(ByteArray* out, std::map<tiny_string, uint32_t>& stringMap,
 				std::map<const ASObject*, uint32_t>& objMap,
 				std::map<const Class_base*, uint32_t>& traitsMap) override;
-	multiname* setVariableByMultiname(const multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset=nullptr) override;
+	multiname* setVariableByMultiname(multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset=nullptr) override;
 };
 
 class Null: public ASObject
@@ -808,7 +848,7 @@ public:
 	int64_t toInt64();
 	GET_VARIABLE_RESULT getVariableByMultiname(asAtom& ret, const multiname& name, GET_VARIABLE_OPTION opt);
 	int32_t getVariableByMultiname_i(const multiname& name);
-	multiname* setVariableByMultiname(const multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset=nullptr);
+	multiname* setVariableByMultiname(multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset=nullptr);
 
 	//Serialization interface
 	void serialize(ByteArray* out, std::map<tiny_string, uint32_t>& stringMap,
@@ -883,12 +923,13 @@ class Global : public ASObject
 private:
 	int scriptId;
 	ABCContext* context;
+	bool isavm1;
 public:
-	Global(Class_base* cb, ABCContext* c, int s);
+	Global(Class_base* cb, ABCContext* c, int s, bool avm1);
 	static void sinit(Class_base* c);
 	static void buildTraits(ASObject* o) {}
 	GET_VARIABLE_RESULT getVariableByMultiname(asAtom& ret, const multiname& name, GET_VARIABLE_OPTION opt=NONE) override;
-	multiname* setVariableByMultiname(const multiname &name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset = nullptr) override;
+	multiname* setVariableByMultiname(multiname &name, asAtom &o, CONST_ALLOWED_FLAG allowConst, bool *alreadyset = nullptr) override;
 	void getVariableByMultinameOpportunistic(asAtom& ret, const multiname& name);
 	/*
 	 * Utility method to register builtin methods and classes
@@ -896,6 +937,7 @@ public:
 	void registerBuiltin(const char* name, const char* ns, _R<ASObject> o, NS_KIND nskind=NAMESPACE);
 	// ensures that the init script has been run
 	void checkScriptInit();
+	bool isAVM1() const { return isavm1; }
 };
 
 void eval(asAtom& ret,SystemState* sys, asAtom& obj,asAtom* args, const unsigned int argslen);

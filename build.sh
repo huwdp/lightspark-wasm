@@ -33,7 +33,7 @@ case "$1" in
         
         # Helps that helped me
         # https://github.com/emscripten-core/emscripten/issues/9614#issuecomment-540867480
-        
+        export CXX=`echo clang | sed -e 's/clang/clang++/;s/gcc/g++/'`
         cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=/home/huw/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -s USE_ZLIB=1 ..
 		;;
     --clang)

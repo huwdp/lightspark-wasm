@@ -54,6 +54,7 @@ class PluginManager;
 class RenderThread;
 class SecurityManager;
 class LocaleManager;
+class CurrencyManager;
 class Tag;
 class ApplicationDomain;
 class ASWorker;
@@ -74,7 +75,7 @@ private:
 	RGB Background;
 	Mutex dictSpinlock;
 	std::unordered_map < uint32_t, DictionaryTag* > dictionary;
-	std::list< std::pair<tiny_string, DictionaryTag*> > classesToBeBound;
+	std::map < QName, DictionaryTag* > classesToBeBound;
 	std::map < tiny_string,FontTag* > embeddedfonts;
 	std::map < uint32_t,FontTag* > embeddedfontsByID;
 
@@ -306,6 +307,7 @@ private:
 	void systemFinalize();
 	std::map<tiny_string, Class_base *> classnamemap;
 	set<ASObject*> constantrefs;
+	list<_R<DisplayObject>> listResetParent;
 public:
 	void setURL(const tiny_string& url) DLL_PUBLIC;
 	tiny_string getDumpedSWFPath() const { return dumpedSWFPath;}
@@ -405,8 +407,9 @@ public:
 	//Application starting time in milliseconds
 	uint64_t startTime;
 
-	//Classes set. They own one reference to each class/template
-	std::set<Class_base*> customClasses;
+	//map of all classed defined in the swf. They own one reference to each class/template
+	//key is the stringID of the class name (without namespace)
+	std::multimap<uint32_t, Class_base*> customClasses;
 	//This is an array of fixed size, we can avoid using std::vector
 	Class_base** builtinClasses;
 	std::map<QName, Template_base*> templates;
@@ -455,6 +458,7 @@ public:
 	Mutex workerMutex;
 	void addWorker(ASWorker* w);
 	void removeWorker(ASWorker* w);
+	void addEventToBackgroundWorkers(_NR<EventDispatcher> obj, _R<Event> ev);
 
 	//Stuff to be done once for process and not for plugin instance
 	static void staticInit() DLL_PUBLIC;
@@ -464,6 +468,7 @@ public:
 	IntervalManager* intervalManager;
 	SecurityManager* securityManager;
 	LocaleManager* localeManager;
+    CurrencyManager* currencyManager;
 	ExtScriptObject* extScriptObject;
 
 	enum SCALE_MODE { EXACT_FIT=0, NO_BORDER=1, NO_SCALE=2, SHOW_ALL=3 };
@@ -536,6 +541,7 @@ public:
 	void openPageInBrowser(const tiny_string& url, const tiny_string& window);
 
 	void showMouseCursor(bool visible);
+	void setMouseHandCursor(bool sethand);
 	void waitRendering() DLL_PUBLIC;
 	EngineData* getEngineData() { return engineData;}
 	uint32_t getSwfVersion();
@@ -559,6 +565,48 @@ public:
 	Cond initializedCond;
 	void waitInitialized();
 	void getClassInstanceByName(asAtom &ret, const tiny_string& clsname);
+	Mutex resetParentMutex;
+	void addDisplayObjectToResetParentList(_R<DisplayObject> child)
+	{
+		Locker l(resetParentMutex);
+		listResetParent.push_back(child);
+	}
+	void resetParentList()
+	{
+		Locker l(resetParentMutex);
+		auto it = listResetParent.begin();
+		while (it != listResetParent.end())
+		{
+			(*it)->setParent(nullptr);
+			it = listResetParent.erase(it);
+		}
+	}
+	bool isInResetParentList(DisplayObject* d)
+	{
+		Locker l(resetParentMutex);
+		auto it = listResetParent.begin();
+		while (it != listResetParent.end())
+		{
+			if ((*it).getPtr()==d)
+				return true;
+			it++;
+		}
+		return false;
+	}
+	void removeFromResetParentList(DisplayObject* d)
+	{
+		Locker l(resetParentMutex);
+		auto it = listResetParent.begin();
+		while (it != listResetParent.end())
+		{
+			if ((*it).getPtr()==d)
+			{
+				listResetParent.erase(it);
+				break;
+			}
+			it++;
+		}
+	}
 };
 
 class ParseThread: public IThreadJob

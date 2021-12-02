@@ -46,15 +46,15 @@ void URLRequest::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, ASObject, _constructor, CLASS_FINAL | CLASS_SEALED);
 	c->setDeclaredMethodByQName("url","",Class<IFunction>::getFunction(c->getSystemState(),_setURL),SETTER_METHOD,true);
-	c->setDeclaredMethodByQName("url","",Class<IFunction>::getFunction(c->getSystemState(),_getURL),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("url","",Class<IFunction>::getFunction(c->getSystemState(),_getURL,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 	c->setDeclaredMethodByQName("method","",Class<IFunction>::getFunction(c->getSystemState(),_setMethod),SETTER_METHOD,true);
-	c->setDeclaredMethodByQName("method","",Class<IFunction>::getFunction(c->getSystemState(),_getMethod),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("method","",Class<IFunction>::getFunction(c->getSystemState(),_getMethod,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 	c->setDeclaredMethodByQName("data","",Class<IFunction>::getFunction(c->getSystemState(),_setData),SETTER_METHOD,true);
-	c->setDeclaredMethodByQName("data","",Class<IFunction>::getFunction(c->getSystemState(),_getData),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("data","",Class<IFunction>::getFunction(c->getSystemState(),_getData,0,Class<ASObject>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 	c->setDeclaredMethodByQName("digest","",Class<IFunction>::getFunction(c->getSystemState(),_setDigest),SETTER_METHOD,true);
-	c->setDeclaredMethodByQName("digest","",Class<IFunction>::getFunction(c->getSystemState(),_getDigest),GETTER_METHOD,true);
-	REGISTER_GETTER_SETTER(c,contentType);
-	REGISTER_GETTER_SETTER(c,requestHeaders);
+	c->setDeclaredMethodByQName("digest","",Class<IFunction>::getFunction(c->getSystemState(),_getDigest,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c,contentType,ASString);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c,requestHeaders,Array);
 }
 
 void URLRequest::buildTraits(ASObject* o)
@@ -434,14 +434,14 @@ void URLLoader::finalize()
 void URLLoader::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, EventDispatcher, _constructor, CLASS_SEALED);
-	c->setDeclaredMethodByQName("dataFormat","",Class<IFunction>::getFunction(c->getSystemState(),_getDataFormat),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("data","",Class<IFunction>::getFunction(c->getSystemState(),_getData),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("dataFormat","",Class<IFunction>::getFunction(c->getSystemState(),_getDataFormat,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("data","",Class<IFunction>::getFunction(c->getSystemState(),_getData,0,Class<ASObject>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 	c->setDeclaredMethodByQName("data","",Class<IFunction>::getFunction(c->getSystemState(),_setData),SETTER_METHOD,true);
 	c->setDeclaredMethodByQName("dataFormat","",Class<IFunction>::getFunction(c->getSystemState(),_setDataFormat),SETTER_METHOD,true);
 	c->setDeclaredMethodByQName("load","",Class<IFunction>::getFunction(c->getSystemState(),load),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("close","",Class<IFunction>::getFunction(c->getSystemState(),close),NORMAL_METHOD,true);
-	REGISTER_GETTER_SETTER(c,bytesLoaded);
-	REGISTER_GETTER_SETTER(c,bytesTotal);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c,bytesLoaded,UInteger);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c,bytesTotal,UInteger);
 }
 
 ASFUNCTIONBODY_GETTER_SETTER(URLLoader, bytesLoaded);
@@ -607,10 +607,17 @@ void SharedObjectFlushStatus::sinit(Class_base* c)
 	c->setVariableAtomByQName("PENDING",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"pending"),DECLARED_TRAIT);
 }
 
-SharedObject::SharedObject(Class_base* c):EventDispatcher(c),hasData(false),client(this),objectEncoding(ObjectEncoding::AMF3)
+SharedObject::SharedObject(Class_base* c):EventDispatcher(c),client(this),objectEncoding(ObjectEncoding::AMF3)
 {
 	subtype=SUBTYPE_SHAREDOBJECT;
 	data=_MR(new_asobject(c->getSystemState()));
+}
+
+bool SharedObject::destruct()
+{
+	if (client.getPtr()==this)
+		client=data;// this is just to set client to "something else" to avoid that this SharedObject has a pointer to itself during destruction
+	return EventDispatcher::destruct();
 }
 
 void SharedObject::sinit(Class_base* c)
@@ -624,7 +631,7 @@ void SharedObject::sinit(Class_base* c)
 	c->setDeclaredMethodByQName("connect","",Class<IFunction>::getFunction(c->getSystemState(),connect),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("setProperty","",Class<IFunction>::getFunction(c->getSystemState(),setProperty),NORMAL_METHOD,true);
 	REGISTER_GETTER_SETTER(c,client);
-	REGISTER_GETTER(c,data);
+	REGISTER_GETTER_RESULTTYPE(c,data,ASObject);
 	c->setDeclaredMethodByQName("defaultObjectEncoding","",Class<IFunction>::getFunction(c->getSystemState(),_getDefaultObjectEncoding),GETTER_METHOD,false);
 	c->setDeclaredMethodByQName("defaultObjectEncoding","",Class<IFunction>::getFunction(c->getSystemState(),_setDefaultObjectEncoding),SETTER_METHOD,false);
 	REGISTER_SETTER(c,fps);
@@ -678,7 +685,6 @@ ASFUNCTIONBODY_ATOM(SharedObject,getLocal)
 	if (secure)
 		LOG(LOG_NOT_IMPLEMENTED,"SharedObject.getLocal: parameter 'secure' is ignored");
 
-
 	tiny_string fullname = localPath + "|";
 	fullname += name;
 	SharedObject* res = nullptr;
@@ -687,7 +693,6 @@ ASFUNCTIONBODY_ATOM(SharedObject,getLocal)
 	{
 		res = Class<SharedObject>::getInstanceS(sys);
 		res->name=localPath;
-		res->hasData=true;
 		if (sys->localStorageAllowed())
 		{
 			ByteArray* b = Class<ByteArray>::getInstanceS(sys);
@@ -720,7 +725,7 @@ ASFUNCTIONBODY_ATOM(SharedObject,getRemote)
 }
 bool SharedObject::doFlush()
 {
-	if (hasData && !data.isNull() && getSystemState()->localStorageAllowed())
+	if (!data.isNull() && data->numVariables() && getSystemState()->localStorageAllowed())
 	{
 		ByteArray* b = Class<ByteArray>::getInstanceS(getSystemState());
 		b->writeObject(data.getPtr());
@@ -750,7 +755,6 @@ ASFUNCTIONBODY_ATOM(SharedObject,clear)
 {
 	SharedObject* th=asAtomHandler::as<SharedObject>(obj);
 	th->data->destroyContents();
-	th->hasData=false;
 	sys->getEngineData()->removeSharedObject(th->name);
 }
 
@@ -2006,7 +2010,7 @@ void NetStream::execute()
 				audioDecoder=streamDecoder->audioDecoder;
 			
 			if(audioStream==NULL && audioDecoder && audioDecoder->isValid())
-				audioStream=getSys()->audioManager->createStream(audioDecoder,streamDecoder->hasVideo(),nullptr,0);
+				audioStream=getSys()->audioManager->createStream(audioDecoder,streamDecoder->hasVideo(),nullptr,0,soundTransform ? soundTransform->volume : 1.0);
 			if(!tickStarted && isReady() && frameRate && ((framesdecoded / frameRate) >= this->bufferTime))
 			{
 				tickStarted=true;

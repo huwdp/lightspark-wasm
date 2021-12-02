@@ -84,21 +84,24 @@ bool InputThread::worker(SDL_Event *event)
 		{
 			if(m_sys->currentVm == nullptr)
 				break;
-		
-			Locker locker(mutexListeners);
-		
 			_NR<InteractiveObject> target = m_sys->stage->getFocusTarget();
 			if (target.isNull())
 				break;
-		
-			tiny_string s = event->text.text;
-			target->incRef();
-			m_sys->currentVm->addIdleEvent(NullRef, _MR(new (m_sys->unaccountedMemory) TextInputEvent(target,s)));
+			// SDL_TEXINPUT sometimes seems to send an empty text, we ignore those events
+			tiny_string s = std::string(event->text.text);
+			if (s.numChars()> 0)
+			{
+				target->incRef();
+				m_sys->currentVm->addIdleEvent(NullRef, _MR(new (m_sys->unaccountedMemory) TextInputEvent(target,s)));
+			}
 			break;
 		}
 		case SDL_MOUSEBUTTONDOWN:
 		{
-			button1pressed=false;
+			{
+				Locker locker(mutexListeners);
+				button1pressed=false;
+			}
 			if(event->button.button == SDL_BUTTON_LEFT)
 			{
 				//Grab focus, to receive keypresses
@@ -129,7 +132,10 @@ bool InputThread::worker(SDL_Event *event)
 			handleMouseUp(stageX,stageY,SDL_GetModState(),event->button.state == SDL_PRESSED,event->button.button);
 			ret=true;
 			if (event->button.button == SDL_BUTTON_LEFT)
+			{
+				Locker locker(mutexListeners);
 				button1pressed=true;
+			}
 			break;
 		}
 		case SDL_MOUSEMOTION:
@@ -143,7 +149,10 @@ bool InputThread::worker(SDL_Event *event)
 			else
 				m_sys->windowToStageCoordinates(event->motion.x,event->motion.y,stageX,stageY);
 			handleMouseMove(stageX,stageY,SDL_GetModState(),event->motion.state == SDL_PRESSED);
-			button1pressed=false;
+			{
+				Locker locker(mutexListeners);
+				button1pressed=false;
+			}
 			ret=true;
 			break;
 		}
@@ -260,12 +269,12 @@ void InputThread::handleMouseDown(uint32_t x, uint32_t y, SDL_Keymod buttonState
 	_NR<InteractiveObject> selected = getMouseTarget(x, y, DisplayObject::MOUSE_CLICK);
 	if (selected.isNull())
 		return;
-	Locker locker(mutexListeners);
 	number_t localX, localY;
 	selected->globalToLocal(x,y,localX,localY);
 	selected->incRef();
 	m_sys->currentVm->addIdleEvent(selected,
 		_MR(Class<MouseEvent>::getInstanceS(m_sys,"mouseDown",localX,localY,true,buttonState,pressed)));
+	Locker locker(mutexListeners);
 	lastMouseDownTarget=selected;
 }
 
@@ -276,7 +285,6 @@ void InputThread::handleMouseDoubleClick(uint32_t x, uint32_t y, SDL_Keymod butt
 	_NR<InteractiveObject> selected = getMouseTarget(x, y, DisplayObject::DOUBLE_CLICK);
 	if (selected.isNull())
 		return;
-	Locker locker(mutexListeners);
 	number_t localX, localY;
 	selected->globalToLocal(x,y,localX,localY);
 	selected->incRef();
@@ -291,7 +299,6 @@ void InputThread::handleMouseUp(uint32_t x, uint32_t y, SDL_Keymod buttonState, 
 	_NR<InteractiveObject> selected = getMouseTarget(x, y, DisplayObject::MOUSE_CLICK);
 	if (selected.isNull())
 		return;
-	Locker locker(mutexListeners);
 	number_t localX, localY;
 	selected->globalToLocal(x,y,localX,localY);
 	selected->incRef();
@@ -303,8 +310,11 @@ void InputThread::handleMouseUp(uint32_t x, uint32_t y, SDL_Keymod buttonState, 
 	}
 	m_sys->currentVm->addIdleEvent(selected,
 		_MR(Class<MouseEvent>::getInstanceS(m_sys,"mouseUp",localX,localY,true,buttonState,pressed)));
+	mutexListeners.lock();
 	if(lastMouseDownTarget==selected)
 	{
+		lastMouseDownTarget=NullRef;
+		mutexListeners.unlock();
 		//Also send the click event
 		selected->incRef();
 		m_sys->currentVm->addIdleEvent(selected,
@@ -312,11 +322,18 @@ void InputThread::handleMouseUp(uint32_t x, uint32_t y, SDL_Keymod buttonState, 
 	}
 	else if (lastMouseDownTarget)
 	{
-		lastMouseDownTarget->incRef();
-		m_sys->currentVm->addIdleEvent(lastMouseDownTarget,
+		_NR<InteractiveObject> tmp = lastMouseDownTarget;
+		lastMouseDownTarget=NullRef;
+		mutexListeners.unlock();
+		tmp->incRef();
+		m_sys->currentVm->addIdleEvent(tmp,
 			_MR(Class<MouseEvent>::getInstanceS(m_sys,"releaseOutside",localX,localY,true,buttonState,pressed)));
 	}
-	lastMouseDownTarget=NullRef;
+	else
+	{
+		lastMouseDownTarget=NullRef;
+		mutexListeners.unlock();
+	}
 }
 
 void InputThread::handleMouseMove(uint32_t x, uint32_t y, SDL_Keymod buttonState, bool pressed)
@@ -408,7 +425,6 @@ void InputThread::handleScrollEvent(uint32_t x, uint32_t y, uint32_t direction, 
 	_NR<InteractiveObject> selected = getMouseTarget(x, y, DisplayObject::MOUSE_CLICK);
 	if (selected.isNull())
 		return;
-	Locker locker(mutexListeners);
 	number_t localX, localY;
 	selected->globalToLocal(x,y,localX,localY);
 	selected->incRef();
@@ -418,7 +434,7 @@ void InputThread::handleScrollEvent(uint32_t x, uint32_t y, uint32_t direction, 
 
 void InputThread::handleMouseLeave()
 {
-	if(m_sys->currentVm == NULL)
+	if(m_sys->currentVm == nullptr)
 		return;
 
 	_NR<Stage> stage = _MR(m_sys->stage);
@@ -443,7 +459,6 @@ bool InputThread::handleKeyboardShortcuts(const SDL_KeyboardEvent *keyevent)
 		_NR<InteractiveObject> selected = getMouseTarget(stageX,stageY, DisplayObject::MOUSE_CLICK);
 		if (!selected.isNull())
 		{
-			Locker locker(mutexListeners);
 			number_t localX, localY;
 			selected->globalToLocal(x,y,localX,localY);
 			selected->incRef();
@@ -667,8 +682,6 @@ void InputThread::sendKeyEvent(const SDL_KeyboardEvent *keyevent)
 	if(m_sys->currentVm == NULL)
 		return;
 
-	Locker locker(mutexListeners);
-
 	_NR<DisplayObject> target = m_sys->stage->getFocusTarget();
 	if (target.isNull())
 		return;
@@ -684,36 +697,6 @@ void InputThread::sendKeyEvent(const SDL_KeyboardEvent *keyevent)
 	    _MR(Class<KeyboardEvent>::getInstanceS(m_sys,type,keyevent->keysym.scancode,getAS3KeyCode(keyevent->keysym.sym), (SDL_Keymod)keyevent->keysym.mod,keyevent->keysym.sym)));
 }
 
-void InputThread::addListener(InteractiveObject* ob)
-{
-	Locker locker(mutexListeners);
-	assert(ob);
-
-#ifndef NDEBUG
-	vector<InteractiveObject*>::const_iterator it=find(listeners.begin(),listeners.end(),ob);
-	//Object is already register, should not happen
-	if(it != listeners.end())
-	{
-		LOG(LOG_ERROR, "Trying to addListener an InteractiveObject that's already added.");
-		return;
-	}
-#endif
-	
-	//Register the listener
-	listeners.push_back(ob);
-}
-
-void InputThread::removeListener(InteractiveObject* ob)
-{
-	Locker locker(mutexListeners);
-
-	vector<InteractiveObject*>::iterator it=find(listeners.begin(),listeners.end(),ob);
-	if(it==listeners.end()) //Listener not found
-		return;
-	
-	//Unregister the listener
-	listeners.erase(it);
-}
 
 void InputThread::startDrag(_R<Sprite> s, const lightspark::RECT* limit, Vector2f offset)
 {

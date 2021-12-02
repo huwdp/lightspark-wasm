@@ -508,10 +508,10 @@ ColorTransform::ColorTransform(Class_base* c, const CXFORMWITHALPHA& cx)
 
 void ColorTransform::applyTransformation(const RGBA& color, float& r, float& g, float& b, float &a)
 {
-	a = max(0.0,min(255.0,((color.Alpha * alphaMultiplier * 256.0)/256.0 + alphaOffset)))/256.0;
-	r = max(0.0,min(255.0,((color.Red   *   redMultiplier * 256.0)/256.0 +   redOffset)))/256.0;
-	g = max(0.0,min(255.0,((color.Green * greenMultiplier * 256.0)/256.0 + greenOffset)))/256.0;
-	b = max(0.0,min(255.0,((color.Blue  *  blueMultiplier * 256.0)/256.0 +  blueOffset)))/256.0;
+	a = max(0.0f,min(255.0f,float((color.Alpha * alphaMultiplier * 256.0f)/256.0f + alphaOffset)))/256.0f;
+	r = max(0.0f,min(255.0f,float((color.Red   *   redMultiplier * 256.0f)/256.0f +   redOffset)))/256.0f;
+	g = max(0.0f,min(255.0f,float((color.Green * greenMultiplier * 256.0f)/256.0f + greenOffset)))/256.0f;
+	b = max(0.0f,min(255.0f,float((color.Blue  *  blueMultiplier * 256.0f)/256.0f +  blueOffset)))/256.0f;
 	
 }
 
@@ -541,6 +541,27 @@ uint8_t *ColorTransform::applyTransformation(BitmapContainer* bm)
 		src++;
 	}
 	return (uint8_t*)bm->getDataColorTransformed();
+}
+
+void ColorTransform::applyTransformation(uint8_t* bm, uint32_t size)
+{
+	if (redMultiplier==1.0 &&
+		greenMultiplier==1.0 &&
+		blueMultiplier==1.0 &&
+		alphaMultiplier==1.0 &&
+		redOffset==0.0 &&
+		greenOffset==0.0 &&
+		blueOffset==0.0 &&
+		alphaOffset==0.0)
+		return;
+
+	for (uint32_t i = 0; i < size; i+=4)
+	{
+		bm[i+3] = max(0,min(255,int(((number_t(bm[i+3]) * alphaMultiplier) + alphaOffset))));
+		bm[i+2] = max(0,min(255,int(((number_t(bm[i+2]) *  blueMultiplier) +  blueOffset)*(number_t(bm[i+3])/255.0))));
+		bm[i+1] = max(0,min(255,int(((number_t(bm[i+1]) * greenMultiplier) + greenOffset)*(number_t(bm[i+3])/255.0))));
+		bm[i  ] = max(0,min(255,int(((number_t(bm[i  ]) *   redMultiplier) +   redOffset)*(number_t(bm[i+3])/255.0))));
+	}
 }
 
 void ColorTransform::setProperties(const CXFORMWITHALPHA &cx)
@@ -1469,11 +1490,11 @@ void Vector3D::sinit(Class_base* c)
 	
 	// methods 
 	c->setDeclaredMethodByQName("add","",Class<IFunction>::getFunction(c->getSystemState(),add),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("angleBetween","",Class<IFunction>::getFunction(c->getSystemState(),angleBetween),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("angleBetween","",Class<IFunction>::getFunction(c->getSystemState(),angleBetween),NORMAL_METHOD,false);
 	c->setDeclaredMethodByQName("clone","",Class<IFunction>::getFunction(c->getSystemState(),clone),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("crossProduct","",Class<IFunction>::getFunction(c->getSystemState(),crossProduct),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("decrementBy","",Class<IFunction>::getFunction(c->getSystemState(),decrementBy),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("distance","",Class<IFunction>::getFunction(c->getSystemState(),distance),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("distance","",Class<IFunction>::getFunction(c->getSystemState(),distance),NORMAL_METHOD,false);
 	c->setDeclaredMethodByQName("dotProduct","",Class<IFunction>::getFunction(c->getSystemState(),dotProduct),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("equals","",Class<IFunction>::getFunction(c->getSystemState(),equals),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("incrementBy","",Class<IFunction>::getFunction(c->getSystemState(),incrementBy),NORMAL_METHOD,true);

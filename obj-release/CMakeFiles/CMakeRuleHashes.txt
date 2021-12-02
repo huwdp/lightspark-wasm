@@ -1,0 +1,6 @@
+# Hashes of file build rules.
+f9a91fd104cbe99da8690053a4f90a63 CMakeFiles/translations
+7f722d268ad0b848203cf34ca937908d CMakeFiles/uninstall
+67295d212b13cf2dfcd7b86b108589f5 fr.gmo
+22605fcb502f7737ae27c7b8057ce492 pl.gmo
+fbe987f13dad42fdb57fa35b781fdafe zh_CN.gmo

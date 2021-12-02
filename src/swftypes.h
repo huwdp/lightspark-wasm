@@ -46,7 +46,8 @@ enum BUILTIN_STRINGS { EMPTY=0, STRING_WILDCARD='*', ANY=BUILTIN_STRINGS_CHAR_MA
 					   ,STRING_AVM1_TARGET,STRING_THIS,STRING_AVM1_ROOT,STRING_AVM1_PARENT,STRING_AVM1_GLOBAL,STRING_SUPER
 					   ,STRING_ONENTERFRAME,STRING_ONMOUSEMOVE,STRING_ONMOUSEDOWN,STRING_ONMOUSEUP,STRING_ONPRESS,STRING_ONRELEASE,STRING_ONRELEASEOUTSIDE,STRING_ONMOUSEWHEEL, STRING_ONLOAD
 					   ,STRING_OBJECT,STRING_UNDEFINED,STRING_BOOLEAN,STRING_NUMBER,STRING_STRING,STRING_FUNCTION_LOWERCASE,STRING_ONROLLOVER,STRING_ONROLLOUT
-					   ,STRING_PROTO
+					   ,STRING_PROTO,STRING_TARGET,STRING_FLASH_EVENTS_IEVENTDISPATCHER,STRING_ADDEVENTLISTENER,STRING_REMOVEEVENTLISTENER,STRING_DISPATCHEVENT,STRING_HASEVENTLISTENER
+					   ,STRING_ONCONNECT,STRING_ONDATA,STRING_ONCLOSE
 					   ,LAST_BUILTIN_STRING };
 enum BUILTIN_NAMESPACES { EMPTY_NS=0, AS3_NS };
 
@@ -505,11 +506,27 @@ public:
 	}
 };
 
-//TODO: Really implement or suppress
-typedef UI32_SWF FIXED;
+class FIXED
+{
+friend std::istream& operator>>(std::istream& s, FIXED& v);
+protected:
+	int32_t val;
+public:
+	FIXED():val(0){}
+	FIXED(int32_t v):val(v){}
+	operator number_t() const{ return number_t(val)/65536.0; }
+};
 
-//TODO: Really implement or suppress
-typedef UI16_SWF FIXED8;
+class FIXED8
+{
+friend std::istream& operator>>(std::istream& s, FIXED8& v);
+protected:
+	int16_t val;
+public:
+	FIXED8():val(0){}
+	FIXED8(int16_t v):val(v){}
+	operator number_t() const{ return number_t(val)/256.0; }
+};
 
 class RECORDHEADER
 {
@@ -741,6 +758,19 @@ inline std::istream& operator>>(std::istream& s, DOUBLE& v)
 	return s;
 }
 
+inline std::istream& operator>>(std::istream& s, FIXED& v)
+{
+	s.read((char*)&v.val,4);
+	v.val=GINT32_FROM_LE(v.val);
+	return s;
+}
+inline std::istream& operator>>(std::istream& s, FIXED8& v)
+{
+	s.read((char*)&v.val,2);
+	v.val=GINT16_FROM_LE(v.val);
+	return s;
+}
+
 inline std::istream& operator>>(std::istream& s, RECORDHEADER& v)
 {
 	s >> v.CodeAndLen;
@@ -878,7 +908,7 @@ public:
 };
 
 template<class T> class Vector2Tmpl;
-typedef Vector2Tmpl<int> Vector2;
+typedef Vector2Tmpl<int32_t> Vector2;
 typedef Vector2Tmpl<double> Vector2f;
 
 class MATRIX: public cairo_matrix_t
@@ -1028,6 +1058,7 @@ public:
 	int InterpolationMode;
 	FIXED8 StartFocalPoint;
 	FIXED8 EndFocalPoint;
+	std::map<uint16_t,FILLSTYLE> fillstylecache;
 
 	~MORPHFILLSTYLE(){}
 };
@@ -1045,6 +1076,9 @@ class LINESTYLE2
 {
 public:
 	LINESTYLE2(uint8_t v):StartCapStyle(0),JointStyle(0),HasFillFlag(false),NoHScaleFlag(false),NoVScaleFlag(false),PixelHintingFlag(0),FillType(v),version(v){}
+	LINESTYLE2(const LINESTYLE2& r);
+	LINESTYLE2& operator=(LINESTYLE2 r);
+	virtual ~LINESTYLE2();
 	int StartCapStyle;
 	int JointStyle;
 	bool HasFillFlag;
@@ -1082,6 +1116,7 @@ public:
 	UB NoClose;
 	UB EndCapStyle;
 	UI16_SWF MiterLimitFactor;
+	std::map<uint16_t,LINESTYLE2> linestylecache;
 };
 
 class LINESTYLEARRAY
@@ -1187,14 +1222,14 @@ public:
 	UI16_SWF FontID;
 	TEXTRECORD(DefineTextTag* p):parent(p){}
 };
-
+class CharacterRenderer;
 class SHAPE
 {
 	friend std::istream& operator>>(std::istream& stream, SHAPE& v);
 	friend std::istream& operator>>(std::istream& stream, SHAPEWITHSTYLE& v);
 public:
 	SHAPE(uint8_t v=0,bool _forfont=false):fillOffset(0),lineOffset(0),version(v),forfont(_forfont){}
-	virtual ~SHAPE(){}
+	virtual ~SHAPE();
 	UB NumFillBits;
 	UB NumLineBits;
 	unsigned int fillOffset;
@@ -1202,6 +1237,8 @@ public:
 	uint8_t version; /* version of the DefineShape tag, 0 if
 			  * DefineFont or other tag */
 	std::vector<SHAPERECORD> ShapeRecords;
+	std::map<int,CharacterRenderer*> scaledtexturecache;
+	
 	bool forfont;
 };
 
@@ -1275,7 +1312,7 @@ public:
     RGBA GlowColor;
     FIXED BlurX;
     FIXED BlurY;
-    UB Passes;
+    int Passes;
     FIXED8 Strength;
     bool InnerGlow;
     bool Knockout;

@@ -99,10 +99,10 @@ void BitmapData::sinit(Class_base* c)
 	c->setDeclaredMethodByQName("merge","",Class<IFunction>::getFunction(c->getSystemState(),threshold),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("paletteMap","",Class<IFunction>::getFunction(c->getSystemState(),paletteMap),NORMAL_METHOD,true);
 	// properties
-	c->setDeclaredMethodByQName("height","",Class<IFunction>::getFunction(c->getSystemState(),_getHeight),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("rect","",Class<IFunction>::getFunction(c->getSystemState(),getRect),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("width","",Class<IFunction>::getFunction(c->getSystemState(),_getWidth),GETTER_METHOD,true);
-	REGISTER_GETTER(c,transparent);
+	c->setDeclaredMethodByQName("height","",Class<IFunction>::getFunction(c->getSystemState(),_getHeight,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("rect","",Class<IFunction>::getFunction(c->getSystemState(),getRect,0,Class<Rectangle>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("width","",Class<IFunction>::getFunction(c->getSystemState(),_getWidth,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	REGISTER_GETTER_RESULTTYPE(c,transparent,Boolean);
 
 	IBitmapDrawable::linkTraits(c);
 }
@@ -196,24 +196,51 @@ ASFUNCTIONBODY_ATOM(BitmapData,dispose)
 	th->notifyUsers();
 }
 
-void BitmapData::drawDisplayObject(DisplayObject* d, const MATRIX& initialMatrix, bool smoothing)
+void BitmapData::drawDisplayObject(DisplayObject* d, const MATRIX& initialMatrix, bool smoothing, bool forCachedBitmap)
 {
+	if (forCachedBitmap)
+		d->incRef();
 	//Create an InvalidateQueue to store all the hierarchy of objects that must be drawn
-	SoftwareInvalidateQueue queue;
+	SoftwareInvalidateQueue queue(forCachedBitmap ? _MNR(d):NullRef);
 	d->hasChanged=true;
 	d->requestInvalidation(&queue);
+	if (forCachedBitmap)
+	{
+		uint8_t* p = pixels->getData();
+		memset(p,0,pixels->getWidth()*pixels->getHeight()*4);
+	}
 	CairoRenderContext ctxt(pixels->getData(), pixels->getWidth(), pixels->getHeight(),smoothing);
 	for(auto it=queue.queue.begin();it!=queue.queue.end();it++)
 	{
 		DisplayObject* target=(*it).getPtr();
 		//Get the drawable from each of the added objects
-		IDrawable* drawable=target->invalidate(d, initialMatrix,smoothing);
+		IDrawable* drawable=target->invalidate(d, initialMatrix,smoothing,&queue, nullptr);
 		if(drawable==nullptr)
 			continue;
-
+		if (forCachedBitmap)
+			target->hasChanged=false;
 		//Compute the matrix for this object
 		bool isBufferOwner=true;
-		uint8_t* buf=drawable->getPixelBuffer(initialMatrix.getScaleX(),initialMatrix.getScaleY(),&isBufferOwner);
+		uint32_t bufsize=0;
+		uint8_t* buf=drawable->getPixelBuffer(&isBufferOwner,&bufsize);
+		ColorTransform* ct = target->colorTransform.getPtr();
+		DisplayObjectContainer* p = target->getParent();
+		while (!ct && p && p!= d)
+		{
+			ct = p->colorTransform.getPtr();
+			p = p->getParent();
+		}
+		if (ct)
+		{
+			if (!isBufferOwner)
+			{
+				isBufferOwner=true;
+				uint8_t* buf2 = new uint8_t[bufsize];
+				memcpy(buf2,buf,bufsize);
+				buf=buf2;
+			}
+			ct->applyTransformation(buf,bufsize);
+		}
 		//Construct a CachedSurface using the data
 		CachedSurface& surface=ctxt.allocateCustomSurface(target,buf,isBufferOwner);
 		surface.tex->width=drawable->getWidth();
@@ -227,6 +254,10 @@ void BitmapData::drawDisplayObject(DisplayObject* d, const MATRIX& initialMatrix
 		surface.rotation=drawable->getRotation();
 		surface.xscale = drawable->getXScale();
 		surface.yscale = drawable->getYScale();
+		surface.isMask=drawable->getIsMask();
+		surface.mask=drawable->getMask();
+		surface.matrix = drawable->getMatrix();
+		surface.isValid=true;
 		delete drawable;
 	}
 	d->Render(ctxt,true);
@@ -252,7 +283,7 @@ ASFUNCTIONBODY_ATOM(BitmapData,draw)
 				      drawable->getClassName(),
 				      "IBitmapDrawable");
 
-	if(!ctransform.isNull() || !(blendMode.empty() || blendMode == "null") || !clipRect.isNull())
+	if(!(blendMode.empty() || blendMode == "null") || !clipRect.isNull())
 		LOG(LOG_NOT_IMPLEMENTED,"BitmapData.draw does not support many parameters:"<<ctransform.isNull()<<" "<<clipRect.isNull()<<" "<<blendMode);
 
 	if(drawable->is<BitmapData>())
@@ -267,6 +298,8 @@ ASFUNCTIONBODY_ATOM(BitmapData,draw)
 		ctxt.transformedBlit(initialMatrix, data->pixels->getData(),
 				data->pixels->getWidth(), data->pixels->getHeight(),
 				CairoRenderContext::FILTER_NONE);
+		if (ctransform)
+			ctransform->applyTransformation(data->pixels->getData(),data->getBitmapContainer()->getWidth()*data->getBitmapContainer()->getHeight()*4);
 	}
 	else if(drawable->is<DisplayObject>())
 	{
@@ -275,7 +308,9 @@ ASFUNCTIONBODY_ATOM(BitmapData,draw)
 		MATRIX initialMatrix;
 		if(!matrix.isNull())
 			initialMatrix=matrix->getMATRIX();
-		th->drawDisplayObject(d, initialMatrix,smoothing);
+		d->DrawToBitmap(th,initialMatrix,smoothing,false);
+		if (ctransform)
+			ctransform->applyTransformation(th->pixels->getData(),th->getBitmapContainer()->getWidth()*th->getBitmapContainer()->getHeight()*4);
 	}
 	else
 		LOG(LOG_NOT_IMPLEMENTED,"BitmapData.draw does not support " << drawable->toDebugString());
@@ -419,7 +454,7 @@ ASFUNCTIONBODY_ATOM(BitmapData,copyPixels)
 
 	th->pixels->copyRectangle(source->pixels, sourceRect->getRect(),
 				  destPoint->getX(), destPoint->getY(),
-				  mergeAlpha);
+				  mergeAlpha|| !th->transparent);
 	th->notifyUsers();
 }
 
@@ -960,12 +995,25 @@ ASFUNCTIONBODY_ATOM(BitmapData,compare)
 
 ASFUNCTIONBODY_ATOM(BitmapData,applyFilter)
 {
+	BitmapData* th = asAtomHandler::as<BitmapData>(obj);
 	_NR<BitmapData> sourceBitmapData;
 	_NR<Rectangle> sourceRect;
 	_NR<Point> destPoint;
 	_NR<BitmapFilter> filter;
 	ARG_UNPACK_ATOM (sourceBitmapData)(sourceRect)(destPoint)(filter);
-	LOG(LOG_NOT_IMPLEMENTED,"BitmapData.applyFilter not implemented");
+	if (sourceBitmapData.isNull())
+		throwError<TypeError>(kNullPointerError,"sourceBitmapData");
+	if (sourceRect.isNull())
+		throwError<TypeError>(kNullPointerError,"sourceRect");
+	if (destPoint.isNull())
+		throwError<TypeError>(kNullPointerError,"destPoint");
+	if (filter.isNull())
+		throwError<TypeError>(kNullPointerError,"filter");
+	
+	th->pixels->applyFilter(sourceBitmapData->pixels, sourceRect->getRect(),
+				  destPoint->getX(), destPoint->getY(),
+				  filter.getPtr());
+	th->notifyUsers();
 }
 
 ASFUNCTIONBODY_ATOM(BitmapData,noise)

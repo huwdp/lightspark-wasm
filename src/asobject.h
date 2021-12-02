@@ -290,7 +290,7 @@ struct asfreelist
 
 extern SystemState* getSys();
 enum TRAIT_KIND { NO_CREATE_TRAIT=0, DECLARED_TRAIT=1, DYNAMIC_TRAIT=2, INSTANCE_TRAIT=5, CONSTANT_TRAIT=9 /* constants are also declared traits */ };
-enum GET_VARIABLE_RESULT {GETVAR_NORMAL=0x00, GETVAR_CACHEABLE=0x01, GETVAR_ISGETTER=0x02, GETVAR_ISCONSTANT=0x04};
+enum GET_VARIABLE_RESULT {GETVAR_NORMAL=0x00, GETVAR_CACHEABLE=0x01, GETVAR_ISGETTER=0x02, GETVAR_ISCONSTANT=0x04, GETVAR_ISNEWOBJECT=0x08};
 enum GET_VARIABLE_OPTION {NONE=0x00, SKIP_IMPL=0x01, FROM_GETLEX=0x02, DONT_CALL_GETTER=0x04, NO_INCREF=0x08, DONT_CHECK_CLASS=0x10};
 
 #ifdef LIGHTSPARK_64
@@ -503,8 +503,9 @@ public:
 	static FORCE_INLINE bool checkArgumentConversion(const asAtom& a,const asAtom& obj);
 	static asAtom asTypelate(asAtom& a, asAtom& b);
 	static bool isTypelate(asAtom& a,ASObject* type);
+	static bool isTypelate(asAtom& a,asAtom& t);
 	static FORCE_INLINE number_t toNumber(const asAtom& a);
-	static FORCE_INLINE number_t AVM1toNumber(asAtom& a,bool usesActionScript3);
+	static FORCE_INLINE number_t AVM1toNumber(asAtom& a, uint32_t swfversion);
 	static FORCE_INLINE bool AVM1toBool(asAtom& a);
 	static FORCE_INLINE int32_t toInt(const asAtom& a);
 	static FORCE_INLINE int32_t toIntStrict(const asAtom& a);
@@ -662,13 +663,12 @@ public:
 	/**
 	 * Const version of findObjVar, useful when looking for getters
 	 */
-	FORCE_INLINE const variable* findObjVarConst(SystemState* sys,const multiname& mname, uint32_t traitKinds, uint32_t* nsRealId = NULL) const
+	FORCE_INLINE const variable* findObjVarConst(SystemState* sys,const multiname& mname, uint32_t traitKinds, uint32_t* nsRealId = nullptr) const
 	{
 		if (mname.isEmpty())
-			return NULL;
+			return nullptr;
 		uint32_t name=mname.name_type == multiname::NAME_STRING ? mname.name_s_id : mname.normalizedNameId(sys);
-		assert(!mname.ns.empty());
-		
+		bool noNS = mname.ns.empty(); // no Namespace in multiname means we don't care about the namespace and take the first match
 		const_var_iterator ret=Variables.find(name);
 		auto nsIt=mname.ns.cbegin();
 		//Find the namespace
@@ -676,7 +676,7 @@ public:
 		{
 			//breaks when the namespace is not found
 			const nsNameAndKind& ns=ret->second.ns;
-			if(ns==*nsIt || (mname.hasEmptyNS && ns.hasEmptyName()) || (mname.hasBuiltinNS && ns.hasBuiltinName()))
+			if(noNS || ns==*nsIt || (mname.hasEmptyNS && ns.hasEmptyName()) || (mname.hasBuiltinNS && ns.hasBuiltinName()))
 			{
 				if(ret->second.kind & traitKinds)
 				{
@@ -685,7 +685,7 @@ public:
 					return &ret->second;
 				}
 				else
-					return NULL;
+					return nullptr;
 			}
 			else
 			{
@@ -698,14 +698,14 @@ public:
 			}
 		}
 	
-		return NULL;
+		return nullptr;
 	}
 
 	//
-	FORCE_INLINE variable* findObjVar(SystemState* sys,const multiname& mname, uint32_t traitKinds, uint32_t* nsRealId = NULL)
+	FORCE_INLINE variable* findObjVar(SystemState* sys,const multiname& mname, uint32_t traitKinds, uint32_t* nsRealId = nullptr)
 	{
 		if (mname.isEmpty())
-			return NULL;
+			return nullptr;
 		uint32_t name=mname.name_type == multiname::NAME_STRING ? mname.name_s_id : mname.normalizedNameId(sys);
 		bool noNS = mname.ns.empty(); // no Namespace in multiname means we don't care about the namespace and take the first match
 
@@ -725,7 +725,7 @@ public:
 					return &ret->second;
 				}
 				else
-					return NULL;
+					return nullptr;
 			}
 			else
 			{
@@ -738,7 +738,7 @@ public:
 			}
 		}
 
-		return NULL;
+		return nullptr;
 	}
 	
 	//Initialize a new variable specifying the type (TODO: add support for const)
@@ -762,10 +762,7 @@ public:
 		assert_and_throw(n > 0 && n <= slotcount);
 		return slots_vars[n-1]->kind;
 	}
-	FORCE_INLINE Class_base* getSlotType(unsigned int n)
-	{
-		return (Class_base*)slots_vars[n-1]->type;
-	}
+	Class_base* getSlotType(unsigned int n);
 	
 	uint32_t findInstanceSlotByMultiname(multiname* name, SystemState *sys);
 	FORCE_INLINE bool setSlot(unsigned int n, asAtom &o, ASObject* obj);
@@ -1044,14 +1041,14 @@ public:
 	 * thrown.
 	 */
 	void executeASMethod(asAtom &ret, const tiny_string& methodName, std::list<tiny_string> namespaces, asAtom *args, uint32_t num_args);
-	virtual void setVariableByMultiname_i(const multiname& name, int32_t value);
+	virtual void setVariableByMultiname_i(multiname &name, int32_t value);
 	enum CONST_ALLOWED_FLAG { CONST_ALLOWED=0, CONST_NOT_ALLOWED };
 	/*
 	 * If alreadyset is not null, it has to be initialized to false by the caller.
 	 * It will be set to true if the old and new value are the same.
 	 * In that case the old value will not be decReffed.
-	 */ 
-	virtual multiname* setVariableByMultiname(const multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, bool* alreadyset=nullptr)
+	 */
+	virtual multiname* setVariableByMultiname(multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, bool* alreadyset=nullptr)
 	{
 		return setVariableByMultiname_intern(name,o,allowConst,classdef,alreadyset);
 	}
@@ -1066,7 +1063,7 @@ public:
 	 * If no property is found, an instance variable is created.
 	 * Setting CONSTANT_TRAIT is only allowed if allowConst is true
 	 */
-	multiname* setVariableByMultiname_intern(const multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, Class_base* cls,bool *alreadyset);
+	multiname* setVariableByMultiname_intern(multiname& name, asAtom &o, CONST_ALLOWED_FLAG allowConst, Class_base* cls, bool *alreadyset);
 	void setVariableByInteger_intern(int index, asAtom &o, CONST_ALLOWED_FLAG allowConst)
 	{
 		multiname m(nullptr);
@@ -1577,7 +1574,7 @@ FORCE_INLINE number_t asAtomHandler::toNumber(const asAtom& a)
 			return getObjectNoCheck(a)->toNumber();
 	}
 }
-FORCE_INLINE number_t asAtomHandler::AVM1toNumber(asAtom& a,bool usesActionScript3)
+FORCE_INLINE number_t asAtomHandler::AVM1toNumber(asAtom& a, uint32_t swfversion)
 {
 	switch(a.uintval&0x7)
 	{
@@ -1586,7 +1583,7 @@ FORCE_INLINE number_t asAtomHandler::AVM1toNumber(asAtom& a,bool usesActionScrip
 		case ATOM_UINTEGER:
 			return a.uintval>>3;
 		case ATOM_INVALID_UNDEFINED_NULL_BOOL:
-			return (a.uintval&ATOMTYPE_BOOL_BIT) ? (a.uintval&0x80)>>7 : (a.uintval&ATOMTYPE_UNDEFINED_BIT) && usesActionScript3 ? numeric_limits<double>::quiet_NaN() : 0;
+			return (a.uintval&ATOMTYPE_BOOL_BIT) ? (a.uintval&0x80)>>7 : (a.uintval&ATOMTYPE_UNDEFINED_BIT) && swfversion > 6 ? numeric_limits<double>::quiet_NaN() : 0;
 		case ATOM_STRINGID:
 		{
 			ASObject* s = abstract_s(getSys(),a.uintval>>3);
@@ -1961,7 +1958,7 @@ FORCE_INLINE void asAtomHandler::subtract(asAtom& a,SystemState* sys,asAtom &v2,
 		LOG_CALL(_("subtractI ") << num1 << '-' << num2);
 		int64_t res = num1-num2;
 		if (forceint || (res > INT32_MIN>>3 && res < INT32_MAX>>3))
-			setInt(a,sys,res);
+			setInt(a,sys,int32_t(res));
 		else if (res >= 0 && res < UINT32_MAX>>3)
 			setUInt(a,sys,res);
 		else
@@ -1991,7 +1988,7 @@ FORCE_INLINE void asAtomHandler::subtractreplace(asAtom& ret,SystemState* sys,co
 		ASATOM_DECREF(ret);
 		int64_t res = num1-num2;
 		if (forceint || (res > INT32_MIN>>3 && res < INT32_MAX>>3))
-			setInt(ret,sys,res);
+			setInt(ret,sys,int32_t(res));
 		else if (res >= 0 && res < UINT32_MAX>>3)
 			setUInt(ret,sys,res);
 		else

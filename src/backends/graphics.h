@@ -60,7 +60,7 @@ public:
 	TextureChunk& operator=(const TextureChunk& r);
 	~TextureChunk();
 	bool resizeIfLargeEnough(uint32_t w, uint32_t h);
-	uint32_t getNumberOfChunks() const { return ((width+CHUNKSIZE-1)/CHUNKSIZE)*((height+CHUNKSIZE-1)/CHUNKSIZE); }
+	uint32_t getNumberOfChunks() const { return ((width+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL)*((height+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL); }
 	bool isValid() const { return chunks; }
 	void makeEmpty();
 	uint32_t width;
@@ -72,7 +72,7 @@ class CachedSurface
 public:
 	CachedSurface():tex(nullptr),xOffset(0),yOffset(0),xOffsetTransformed(0),yOffsetTransformed(0),widthTransformed(0),heightTransformed(0),alpha(1.0),rotation(0.0),xscale(1.0),yscale(1.0)
 	  , redMultiplier(1.0), greenMultiplier(1.0), blueMultiplier(1.0), alphaMultiplier(1.0), redOffset(0.0), greenOffset(0.0), blueOffset(0.0), alphaOffset(0.0)
-	  ,isMask(false),hasMask(false),isChunkOwner(true){}
+	  ,isMask(false),smoothing(true),isChunkOwner(true),isValid(false){}
 	~CachedSurface()
 	{
 		if (isChunkOwner && tex)
@@ -97,9 +97,12 @@ public:
 	float greenOffset;
 	float blueOffset;
 	float alphaOffset;
+	MATRIX matrix;
+	_NR<DisplayObject> mask;
 	bool isMask;
-	bool hasMask;
+	bool smoothing;
 	bool isChunkOwner;
+	bool isValid;
 };
 
 
@@ -163,32 +166,38 @@ protected:
 	float blueOffset;
 	float alphaOffset;
 	bool isMask;
-	bool hasMask;
+	_NR<DisplayObject> mask;
+	bool smoothing;
+	/**
+	  The whole transformation matrix that is applied to the rendered object
+	*/
+	MATRIX matrix;
 public:
 	IDrawable(int32_t w, int32_t h, int32_t x, int32_t y,
 		int32_t rw, int32_t rh, int32_t rx, int32_t ry, float r,
 		float xs, float ys,
-		bool im, bool hm,
+		bool im, _NR<DisplayObject> _mask,
 		float a, const std::vector<MaskData>& m,
 		float _redMultiplier,float _greenMultiplier,float _blueMultiplier,float _alphaMultiplier,
-		float _redOffset,float _greenOffset,float _blueOffset,float _alphaOffset):
+		float _redOffset,float _greenOffset,float _blueOffset,float _alphaOffset, bool _smoothing,
+		const MATRIX& _m):
 		masks(m),width(w),height(h),xOffset(x),yOffset(y),xOffsetTransformed(rx),yOffsetTransformed(ry),widthTransformed(rw),heightTransformed(rh),rotation(r),
 		alpha(a),xscale(xs),yscale(ys),
 		redMultiplier(_redMultiplier),greenMultiplier(_greenMultiplier),blueMultiplier(_blueMultiplier),alphaMultiplier(_alphaMultiplier),
 		redOffset(_redOffset),greenOffset(_greenOffset),blueOffset(_blueOffset),alphaOffset(_alphaOffset),
-		isMask(im),hasMask(hm) {}
+		isMask(im),mask(_mask),smoothing(_smoothing), matrix(_m) {}
 	virtual ~IDrawable();
 	/*
 	 * This method returns a raster buffer of the image
 	 * The various implementation are responsible for applying the
 	 * masks
 	 */
-	virtual uint8_t* getPixelBuffer(float scalex,float scaley, bool* isBufferOwner=nullptr)=0;
+	virtual uint8_t* getPixelBuffer(bool* isBufferOwner=nullptr, uint32_t* bufsize=nullptr)=0;
 	/*
 	 * This method creates a cairo path that can be used as a mask for
 	 * another object
 	 */
-	virtual void applyCairoMask(cairo_t* cr, int32_t offsetX, int32_t offsetY, float scalex, float scaley) const = 0;
+	virtual void applyCairoMask(cairo_t* cr, int32_t offsetX, int32_t offsetY) const = 0;
 	int32_t getWidth() const { return width; }
 	int32_t getHeight() const { return height; }
 	int32_t getWidthTransformed() const { return widthTransformed; }
@@ -202,7 +211,8 @@ public:
 	float getXScale() const { return xscale; }
 	float getYScale() const { return yscale; }
 	bool getIsMask() const { return isMask; }
-	bool getHasMask() const { return hasMask; }
+	_NR<DisplayObject> getMask() const { return mask; }
+	bool getSmoothing() const { return smoothing; }
 	float getRedMultiplier() const { return redMultiplier; }
 	float getGreenMultiplier() const { return greenMultiplier; }
 	float getBlueMultiplier() const { return blueMultiplier; }
@@ -211,6 +221,7 @@ public:
 	float getGreenOffset() const { return greenOffset; }
 	float getBlueOffset() const { return blueOffset; }
 	float getAlphaOffset() const { return alphaOffset; }
+	MATRIX& getMatrix() { return matrix; }
 };
 
 class AsyncDrawJob: public IThreadJob, public ITextureUploadable
@@ -224,6 +235,7 @@ private:
 	_R<DisplayObject> owner;
 	uint8_t* surfaceBytes;
 	bool uploadNeeded;
+	bool isBufferOwner;
 public:
 	/*
 	 * @param o The DisplayObject that is being rendered. It is a reference to
@@ -257,29 +269,22 @@ protected:
 	   Useful to adapt points defined in pixels and twips (1/20 of pixel)
 	*/
 	const float scaleFactor;
-	bool smoothing;
-	/**
-	  The whole transformation matrix that is applied to the rendered object
-	*/
-	MATRIX matrix;
-	number_t xstart;
-	number_t ystart;
 	static void cairoClean(cairo_t* cr);
 	cairo_surface_t* allocateSurface(uint8_t*& buf);
-	virtual void executeDraw(cairo_t* cr, float scalex, float scaley)=0;
+	virtual void executeDraw(cairo_t* cr)=0;
 	static void copyRGB15To24(uint32_t& dest, uint8_t* src);
 	static void copyRGB24To24(uint32_t& dest, uint8_t* src);
 public:
 	CairoRenderer(const MATRIX& _m, int32_t _x, int32_t _y, int32_t _w, int32_t _h
 				  , int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r
 				  , float _xs, float _ys
-				  , bool _im, bool _hm
+				  , bool _im, _NR<DisplayObject> mask
 				  , float _s, float _a, const std::vector<MaskData>& m
-				  , float _redMultiplier,float _greenMultiplier,float _blueMultiplier,float _alphaMultiplier
-				  , float _redOffset,float _greenOffset,float _blueOffset,float _alphaOffset
-				  , bool _smoothing,number_t _xstart,number_t _ystart);
+				  , float _redMultiplier, float _greenMultiplier, float _blueMultiplier, float _alphaMultiplier
+				  , float _redOffset, float _greenOffset, float _blueOffset, float _alphaOffset
+				  , bool _smoothing);
 	//IDrawable interface
-	uint8_t* getPixelBuffer(float scalex, float scaley, bool* isBufferOwner=nullptr) override;
+	uint8_t* getPixelBuffer(bool* isBufferOwner=nullptr, uint32_t* bufsize=nullptr) override;
 	/*
 	 * Converts data (which is in RGB format) to the format internally used by cairo.
 	 */
@@ -295,8 +300,8 @@ public:
 class CairoTokenRenderer : public CairoRenderer
 {
 private:
-	static cairo_pattern_t* FILLSTYLEToCairo(const FILLSTYLE& style, double scaleCorrection, float scalex, float scaley, bool isMask);
-	static bool cairoPathFromTokens(cairo_t* cr, const tokensVector &tokens, double scaleCorrection, bool skipFill, float scalex, float scaley, number_t xstart, number_t ystart, bool isMask);
+	static cairo_pattern_t* FILLSTYLEToCairo(const FILLSTYLE& style, double scaleCorrection, bool isMask);
+	static bool cairoPathFromTokens(cairo_t* cr, const tokensVector &tokens, double scaleCorrection, bool skipFill, bool isMask, number_t xstart, number_t ystart, int* starttoken=nullptr);
 	static void quadraticBezier(cairo_t* cr, double control_x, double control_y, double end_x, double end_y);
 	/*
 	   The tokens to be drawn
@@ -305,8 +310,10 @@ private:
 	/*
 	 * This is run by CairoRenderer::execute()
 	 */
-	void executeDraw(cairo_t* cr, float scalex, float scaley) override;
-	void applyCairoMask(cairo_t* cr, int32_t offsetX, int32_t offsetY, float scalex, float scaley) const override;
+	void executeDraw(cairo_t* cr) override;
+	void applyCairoMask(cairo_t* cr, int32_t offsetX, int32_t offsetY) const override;
+	number_t xstart;
+	number_t ystart;
 public:
 	/*
 	   CairoTokenRenderer constructor
@@ -324,12 +331,11 @@ public:
 			int32_t _x, int32_t _y, int32_t _w, int32_t _h,
 			int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r,
 			float _xs, float _ys,
-			bool _im, bool _hm,
+			bool _im, _NR<DisplayObject> _mask,
 			float _s, float _a, const std::vector<MaskData>& _ms,
 			float _redMultiplier, float _greenMultiplier, float _blueMultiplier, float _alphaMultiplier,
 			float _redOffset, float _greenOffset, float _blueOffset, float _alphaOffset,
-			bool _smoothing,
-			number_t _xmin, number_t _ymin);
+			bool _smoothing,number_t _xstart, number_t _ystart);
 	/*
 	   Hit testing helper. Uses cairo to find if a point in inside the shape
 
@@ -340,20 +346,28 @@ public:
 	*/
 	static bool hitTest(const tokensVector& tokens, float scaleFactor, number_t x, number_t y);
 };
-
-class TextData
+struct textline
 {
+	tiny_string text;
+	number_t autosizeposition;
+	uint32_t textwidth;
+};
+
+class DLL_PUBLIC TextData
+{
+friend class CairoPangoRenderer;
+protected:
+	std::vector<textline> textlines;
 public:
 	/* the default values are from the spec for flash.text.TextField and flash.text.TextFormat */
 	TextData() : width(100), height(100),leading(0), textWidth(0), textHeight(0), font("Times New Roman"),fontID(UINT32_MAX), scrollH(0), scrollV(1), background(false), backgroundColor(0xFFFFFF),
-		border(false), borderColor(0x000000), multiline(false), textColor(0x000000),
-		autoSize(AS_NONE), fontSize(12), wordWrap(false),caretblinkstate(false) {}
+		border(false), borderColor(0x000000), multiline(false),isBold(false),isItalic(false), textColor(0x000000),
+		autoSize(AS_NONE), fontSize(12), wordWrap(false),caretblinkstate(false),isPassword(false) {}
 	uint32_t width;
 	uint32_t height;
 	int32_t leading;
 	uint32_t textWidth;
 	uint32_t textHeight;
-	tiny_string text;
 	tiny_string font;
 	uint32_t fontID;
 	int32_t scrollH; // pixels, 0-based
@@ -363,12 +377,18 @@ public:
 	bool border;
 	RGB borderColor;
 	bool multiline;
+	bool isBold;
+	bool isItalic;
 	RGB textColor;
 	enum AUTO_SIZE {AS_NONE = 0, AS_LEFT, AS_RIGHT, AS_CENTER };
 	AUTO_SIZE autoSize;
 	uint32_t fontSize;
 	bool wordWrap;
 	bool caretblinkstate;
+	bool isPassword;
+	tiny_string getText(uint32_t line=UINT32_MAX) const;
+	void setText(const char* text);
+	uint32_t getLineCount() const { return textlines.size(); }
 };
 
 class LineData {
@@ -398,32 +418,32 @@ class CairoPangoRenderer : public CairoRenderer
 	/*
 	 * This is run by CairoRenderer::execute()
 	 */
-	void executeDraw(cairo_t* cr, float scalex, float scaley);
+	void executeDraw(cairo_t* cr) override;
 	TextData textData;
 	uint32_t caretIndex;
-	static void pangoLayoutFromData(PangoLayout* layout, const TextData& tData);
-	void applyCairoMask(cairo_t* cr, int32_t offsetX, int32_t offsetY, float scalex, float scaley) const;
+	static void pangoLayoutFromData(PangoLayout* layout, const TextData& tData, uint32_t line=UINT32_MAX);
+	void applyCairoMask(cairo_t* cr, int32_t offsetX, int32_t offsetY) const override;
 	static PangoRectangle lineExtents(PangoLayout *layout, int lineNumber);
 public:
 	CairoPangoRenderer(const TextData& _textData, const MATRIX& _m,
 			int32_t _x, int32_t _y, int32_t _w, int32_t _h,
 			int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r,
 			float _xs, float _ys,
-			bool _im, bool _hm,
+			bool _im, _NR<DisplayObject> _mask,
 			float _s, float _a, const std::vector<MaskData>& _ms,
 			float _redMultiplier, float _greenMultiplier, float _blueMultiplier, float _alphaMultiplier,
 			float _redOffset, float _greenOffset, float _blueOffset, float _alphaOffset,
-			bool _smoothing,number_t _xmin,number_t _ymin,uint32_t _ci)
-		: CairoRenderer(_m,_x,_y,_w,_h,_rx,_ry,_rw,_rh,_r,_xs, _ys,_im,_hm,_s,_a,_ms,
+			bool _smoothing,uint32_t _ci)
+		: CairoRenderer(_m,_x,_y,_w,_h,_rx,_ry,_rw,_rh,_r,_xs, _ys,_im,_mask,_s,_a,_ms,
 						_redMultiplier, _greenMultiplier, _blueMultiplier, _alphaMultiplier,
 						_redOffset, _greenOffset, _blueOffset, _alphaOffset,
-						_smoothing,_xmin,_ymin), textData(_textData),caretIndex(_ci) {}
+						_smoothing), textData(_textData),caretIndex(_ci) {}
 	/**
 		Helper. Uses Pango to find the size of the textdata
 		@param _texttData The textData being tested
 		@param w,h,tw,th are the (text)width and (text)height of the textData.
 	*/
-	static bool getBounds(const TextData& _textData, uint32_t& w, uint32_t& h, uint32_t& tw, uint32_t& th);
+	static bool getBounds(const TextData& _textData, uint32_t& w, uint32_t& h, uint32_t& tw, uint32_t& th, uint32_t line=UINT32_MAX);
 	static std::vector<LineData> getLineData(const TextData& _textData);
 };
 
@@ -435,31 +455,52 @@ public:
 	BitmapRenderer(_NR<BitmapContainer> _data, int32_t _x, int32_t _y, int32_t _w, int32_t _h
 				  , int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r
 				  , float _xs, float _ys
-				  , bool _im, bool _hm
+				  , bool _im, NullableRef<DisplayObject> mask
 				  , float _a, const std::vector<MaskData>& m
 				  , float _redMultiplier, float _greenMultiplier, float _blueMultiplier, float _alphaMultiplier
 				  , float _redOffset, float _greenOffset, float _blueOffset, float _alphaOffset
-				  );
+				  , bool _smoothing, const MATRIX& _m);
 	//IDrawable interface
-	uint8_t* getPixelBuffer(float scalex, float scaley, bool* isBufferOwner=nullptr) override;
-	void applyCairoMask(cairo_t* cr, int32_t offsetX, int32_t offsetY, float scalex, float scaley) const override {}
+	uint8_t* getPixelBuffer(bool* isBufferOwner=nullptr, uint32_t* bufsize=nullptr) override;
+	void applyCairoMask(cairo_t* cr, int32_t offsetX, int32_t offsetY) const override {}
 };
 
 class InvalidateQueue
 {
+protected:
+	_NR<DisplayObject> cacheAsBitmapObject;
 public:
+	InvalidateQueue(_NR<DisplayObject> _cacheAsBitmapObject=NullRef, bool issoftwarequeue=false):cacheAsBitmapObject(_cacheAsBitmapObject),isSoftwareQueue(issoftwarequeue) {}
 	virtual ~InvalidateQueue(){}
 	//Invalidation queue management
 	virtual void addToInvalidateQueue(_R<DisplayObject> d) = 0;
+	_NR<DisplayObject> getCacheAsBitmapObject() const { return cacheAsBitmapObject; }
+	bool isSoftwareQueue;
 };
 
 class SoftwareInvalidateQueue: public InvalidateQueue
 {
 public:
+	SoftwareInvalidateQueue(_NR<DisplayObject> _cacheAsBitmapObject):InvalidateQueue(_cacheAsBitmapObject,true) {}
 	std::list<_R<DisplayObject>> queue;
 	void addToInvalidateQueue(_R<DisplayObject> d) override;
 };
 
+class CharacterRenderer : public ITextureUploadable
+{
+	uint8_t* data;
+	uint32_t width;
+	uint32_t height;
+	TextureChunk chunk;
+public:
+	CharacterRenderer(uint8_t *d, uint32_t w, uint32_t h):data(d),width(w),height(h) {}
+	virtual ~CharacterRenderer() { delete[] data; }
+	//ITextureUploadable interface
+	void sizeNeeded(uint32_t& w, uint32_t& h) const override { w=width; h=height;}
+	void upload(uint8_t* data, uint32_t w, uint32_t h) override;
+	const TextureChunk& getTexture() override;
+	void uploadFence() override {}
+};
 
 }
 #endif /* BACKENDS_GRAPHICS_H */

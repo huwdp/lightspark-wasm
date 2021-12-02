@@ -121,6 +121,7 @@ public:
 	void deinit();
 	bool doRender(ThreadProfile *profile=nullptr, Chronometer *chronometer=nullptr);
 	void generateScreenshot();
+	bool isStarted() const { return status == STARTED; }
 	/**
 	 * @brief updates the arguments of a cachedSurface without recreating the texture
 	 * @param d IDrawable containing the new values
@@ -175,7 +176,6 @@ public:
 	volatile uint32_t windowWidth;
 	volatile uint32_t windowHeight;
 	int fragmentTexScaleUniform;
-	int directUniform;
 
 	void renderErrorPage(RenderThread *rt, bool standalone);
 	void renderSettingsPage();

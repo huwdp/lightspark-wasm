@@ -242,15 +242,15 @@ void ASObject::nextValue(asAtom& ret,uint32_t index)
 
 void ASObject::sinit(Class_base* c)
 {
-	c->setDeclaredMethodByQName("hasOwnProperty",AS3,Class<IFunction>::getFunction(c->getSystemState(),hasOwnProperty),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("hasOwnProperty",AS3,Class<IFunction>::getFunction(c->getSystemState(),hasOwnProperty,1,Class<Boolean>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("setPropertyIsEnumerable",AS3,Class<IFunction>::getFunction(c->getSystemState(),setPropertyIsEnumerable),NORMAL_METHOD,true);
 
-	c->prototype->setVariableByQName("toString","",Class<IFunction>::getFunction(c->getSystemState(),_toString),DYNAMIC_TRAIT);
-	c->prototype->setVariableByQName("toLocaleString","",Class<IFunction>::getFunction(c->getSystemState(),_toLocaleString),DYNAMIC_TRAIT);
-	c->prototype->setVariableByQName("valueOf","",Class<IFunction>::getFunction(c->getSystemState(),valueOf),DYNAMIC_TRAIT);
-	c->prototype->setVariableByQName("hasOwnProperty","",Class<IFunction>::getFunction(c->getSystemState(),hasOwnProperty),DYNAMIC_TRAIT);
-	c->prototype->setVariableByQName("isPrototypeOf","",Class<IFunction>::getFunction(c->getSystemState(),isPrototypeOf),DYNAMIC_TRAIT);
-	c->prototype->setVariableByQName("propertyIsEnumerable","",Class<IFunction>::getFunction(c->getSystemState(),propertyIsEnumerable),DYNAMIC_TRAIT);
+	c->prototype->setVariableByQName("toString","",Class<IFunction>::getFunction(c->getSystemState(),_toString,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),DYNAMIC_TRAIT);
+	c->prototype->setVariableByQName("toLocaleString","",Class<IFunction>::getFunction(c->getSystemState(),_toLocaleString,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),DYNAMIC_TRAIT);
+	c->prototype->setVariableByQName("valueOf","",Class<IFunction>::getFunction(c->getSystemState(),valueOf,0,Class<ASObject>::getRef(c->getSystemState()).getPtr()),DYNAMIC_TRAIT);
+	c->prototype->setVariableByQName("hasOwnProperty","",Class<IFunction>::getFunction(c->getSystemState(),hasOwnProperty,1,Class<Boolean>::getRef(c->getSystemState()).getPtr()),DYNAMIC_TRAIT);
+	c->prototype->setVariableByQName("isPrototypeOf","",Class<IFunction>::getFunction(c->getSystemState(),isPrototypeOf,1,Class<Boolean>::getRef(c->getSystemState()).getPtr()),DYNAMIC_TRAIT);
+	c->prototype->setVariableByQName("propertyIsEnumerable","",Class<IFunction>::getFunction(c->getSystemState(),propertyIsEnumerable,1,Class<Boolean>::getRef(c->getSystemState()).getPtr()),DYNAMIC_TRAIT);
 	c->prototype->setVariableByQName("setPropertyIsEnumerable","",Class<IFunction>::getFunction(c->getSystemState(),setPropertyIsEnumerable),DYNAMIC_TRAIT);
 }
 
@@ -585,13 +585,23 @@ void ASObject::setDeclaredMethodByQName(uint32_t nameId, const nsNameAndKind& ns
 	{
 		obj=Variables.findObjVar(nameId,ns,DECLARED_TRAIT, DECLARED_TRAIT);
 	}
+	if(this->is<Class_base>() && !this->is<Class_inherit>())
+	{
+		Class_base* cls = this->as<Class_base>()->super.getPtr();
+		while (cls)
+		{
+			cls->addoverriddenmethod(nameId);
+			cls = cls->super.getPtr();
+		}
+	}
+	
 	obj->isenumerable = isEnumerable;
 	switch(type)
 	{
 		case NORMAL_METHOD:
 		{
 			asAtom v = asAtomHandler::fromObject(o);
-			obj->setVar(v,this);
+			obj->setVarNoCoerce(v,this);
 			break;
 		}
 		case GETTER_METHOD:
@@ -607,7 +617,8 @@ void ASObject::setDeclaredMethodByQName(uint32_t nameId, const nsNameAndKind& ns
 			break;
 		}
 	}
-	obj->setResultType((const Type*)o->getReturnType());
+	if (type != SETTER_METHOD)
+		obj->setResultType((const Type*)o->getReturnType());
 	o->functionname = nameId;
 }
 
@@ -711,7 +722,7 @@ bool ASObject::deleteVariableByMultiname(const multiname& name)
 }
 
 //In all setter we first pass the value to the interface to see if special handling is possible
-void ASObject::setVariableByMultiname_i(const multiname& name, int32_t value)
+void ASObject::setVariableByMultiname_i(multiname& name, int32_t value)
 {
 	check();
 	asAtom v = asAtomHandler::fromInt(value);
@@ -741,7 +752,7 @@ variable* ASObject::findSettable(const multiname& name, bool* has_getter)
 }
 
 
-multiname *ASObject::setVariableByMultiname_intern(const multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, Class_base* cls, bool *alreadyset)
+multiname *ASObject::setVariableByMultiname_intern(multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, Class_base* cls, bool *alreadyset)
 {
 	multiname *retval = nullptr;
 	check();
@@ -989,6 +1000,11 @@ void variables_map::killObjVar(SystemState* sys,const multiname& mname)
 	throw RunTimeException("Variable to kill not found");
 }
 
+Class_base* variables_map::getSlotType(unsigned int n)
+{
+	return (Class_base*)(dynamic_cast<const Class_base*>(slots_vars[n-1]->type));
+}
+
 variable* variables_map::findObjVar(SystemState* sys,const multiname& mname, TRAIT_KIND createKind, uint32_t traitKinds)
 {
 	uint32_t name=mname.name_type == multiname::NAME_STRING ? mname.name_s_id : mname.normalizedNameId(sys);
@@ -1041,7 +1057,7 @@ variable* variables_map::findObjVar(SystemState* sys,const multiname& mname, TRA
 
 void variables_map::initializeVar(multiname& mname, asAtom& obj, multiname* typemname, ABCContext* context, TRAIT_KIND traitKind, ASObject* mainObj, uint32_t slot_id,bool isenumerable)
 {
-	const Type* type = NULL;
+	const Type* type = nullptr;
 	if (typemname->isStatic)
 		type = typemname->cachedType;
 	
@@ -1049,11 +1065,11 @@ void variables_map::initializeVar(multiname& mname, asAtom& obj, multiname* type
 	 /* If typename is a builtin type, we coerce obj.
 	  * It it's not it must be a user defined class,
 	  * so we try to find the class it is derived from and create an apropriate uninitialized instance */
-	if (type == NULL)
+	if (type == nullptr)
 		type = Type::getBuiltinType(mainObj->getSystemState(),typemname);
-	if (type == NULL)
+	if (type == nullptr)
 		type = Type::getTypeFromMultiname(typemname,context);
-	if(type==NULL)
+	if(type==nullptr)
 	{
 		if (asAtomHandler::isInvalid(obj)) // create dynamic object
 		{
@@ -1092,7 +1108,7 @@ void variables_map::initializeVar(multiname& mname, asAtom& obj, multiname* type
 		else
 			value = obj;
 
-		if (typemname->isStatic && typemname->cachedType == NULL)
+		if (typemname->isStatic && typemname->cachedType == nullptr)
 			typemname->cachedType = type;
 	}
 	assert(traitKind==DECLARED_TRAIT || traitKind==CONSTANT_TRAIT || traitKind == INSTANCE_TRAIT);
@@ -1419,7 +1435,7 @@ GET_VARIABLE_RESULT ASObject::getVariableByMultinameIntern(asAtom &ret, const mu
 	assert(!cls || classdef->isSubClass(cls));
 	uint32_t nsRealId;
 	GET_VARIABLE_RESULT res = GET_VARIABLE_RESULT::GETVAR_NORMAL;
-	variable* obj=Variables.findObjVar(getSystemState(),name,((opt & FROM_GETLEX) || name.hasEmptyNS || name.hasBuiltinNS) ? DECLARED_TRAIT|DYNAMIC_TRAIT : DECLARED_TRAIT,&nsRealId);
+	variable* obj=Variables.findObjVar(getSystemState(),name,((opt & FROM_GETLEX) || name.hasEmptyNS || name.hasBuiltinNS || name.ns.empty()) ? DECLARED_TRAIT|DYNAMIC_TRAIT : DECLARED_TRAIT,&nsRealId);
 	if(obj)
 	{
 		//It seems valid for a class to redefine only the setter, so if we can't find
@@ -1495,7 +1511,7 @@ GET_VARIABLE_RESULT ASObject::getVariableByMultinameIntern(asAtom &ret, const mu
 			if (asAtomHandler::getClosure(obj->var))
 			{
 				LOG_CALL("function " << name << " is already bound to "<<asAtomHandler::toDebugString(obj->var) );
-				if (asAtomHandler::getObject(obj->var)->as<IFunction>()->isCloned)
+				if (asAtomHandler::getObject(obj->var)->as<IFunction>()->clonedFrom)
 					ASATOM_INCREF(obj->var);
 				asAtomHandler::getClosure(obj->var)->incRef();
 				asAtomHandler::set(ret,obj->var);
@@ -1642,7 +1658,7 @@ void variables_map::dumpVariables()
 		}
 		LOG(LOG_INFO, kind <<  '[' << it->second.ns << "] "<< hex<<it->first<<dec<<" "<<
 			getSys()->getStringFromUniqueId(it->first) << ' ' <<
-			asAtomHandler::toDebugString(it->second.var) << ' ' << asAtomHandler::toDebugString(it->second.setter) << ' ' << asAtomHandler::toDebugString(it->second.getter) << ' ' <<it->second.slotid);
+			asAtomHandler::toDebugString(it->second.var) << ' ' << asAtomHandler::toDebugString(it->second.setter) << ' ' << asAtomHandler::toDebugString(it->second.getter) << ' ' <<it->second.slotid << ' ' );//<<dynamic_cast<const Class_base*>(it->second.type));
 	}
 }
 
@@ -1801,20 +1817,6 @@ bool ASObject::AVM1HandleMouseEventStandard(ASObject *dispobj,MouseEvent *e)
 			result=true;
 		}
 	}
-	else if (e->type == "click")
-	{
-		if (dispobj && ((dispobj == this && !dispobj->is<DisplayObject>()) 
-				|| (dispobj->as<DisplayObject>()->isVisible() && this->is<DisplayObject>() && dispobj->as<DisplayObject>()->findParent(this->as<DisplayObject>()))))
-		{
-			m.name_s_id=BUILTIN_STRINGS::STRING_ONRELEASE;
-			AVM1getVariableByMultiname(func,m);
-			if (asAtomHandler::is<AVM1Function>(func))
-			{
-				asAtomHandler::as<AVM1Function>(func)->call(&ret,&obj,nullptr,0);
-				result=true;
-			}
-		}
-	}
 	else if (e->type == "mouseDown")
 	{
 		if (dispobj && ((dispobj == this && !dispobj->is<DisplayObject>()) 
@@ -1839,6 +1841,17 @@ bool ASObject::AVM1HandleMouseEventStandard(ASObject *dispobj,MouseEvent *e)
 	}
 	else if (e->type == "mouseUp")
 	{
+		if (dispobj && ((dispobj == this && !dispobj->is<DisplayObject>()) 
+				|| (dispobj->as<DisplayObject>()->isVisible() && this->is<DisplayObject>() && dispobj->as<DisplayObject>()->findParent(this->as<DisplayObject>()))))
+		{
+			m.name_s_id=BUILTIN_STRINGS::STRING_ONRELEASE;
+			AVM1getVariableByMultiname(func,m);
+			if (asAtomHandler::is<AVM1Function>(func))
+			{
+				asAtomHandler::as<AVM1Function>(func)->call(&ret,&obj,nullptr,0);
+				result=true;
+			}
+		}
 		m.name_s_id=BUILTIN_STRINGS::STRING_ONMOUSEUP;
 		AVM1getVariableByMultiname(func,m);
 		if (asAtomHandler::is<AVM1Function>(func))
@@ -1869,22 +1882,30 @@ bool ASObject::AVM1HandleMouseEventStandard(ASObject *dispobj,MouseEvent *e)
 	}
 	else if (e->type == "rollOver")
 	{
-		m.name_s_id=BUILTIN_STRINGS::STRING_ONROLLOVER;
-		AVM1getVariableByMultiname(func,m);
-		if (asAtomHandler::is<AVM1Function>(func))
+		if (dispobj && ((dispobj == this && !dispobj->is<DisplayObject>()) 
+				|| (dispobj->as<DisplayObject>()->isVisible() && this->is<DisplayObject>() && dispobj->as<DisplayObject>()->findParent(this->as<DisplayObject>()))))
 		{
-			asAtomHandler::as<AVM1Function>(func)->call(&ret,&obj,nullptr,0);
-			result=true;
+			m.name_s_id=BUILTIN_STRINGS::STRING_ONROLLOVER;
+			AVM1getVariableByMultiname(func,m);
+			if (asAtomHandler::is<AVM1Function>(func))
+			{
+				asAtomHandler::as<AVM1Function>(func)->call(&ret,&obj,nullptr,0);
+				result=true;
+			}
 		}
 	}
 	else if (e->type == "rollOut")
 	{
-		m.name_s_id=BUILTIN_STRINGS::STRING_ONROLLOUT;
-		AVM1getVariableByMultiname(func,m);
-		if (asAtomHandler::is<AVM1Function>(func))
+		if (dispobj && ((dispobj == this && !dispobj->is<DisplayObject>()) 
+				|| (dispobj->as<DisplayObject>()->isVisible() && this->is<DisplayObject>() && dispobj->as<DisplayObject>()->findParent(this->as<DisplayObject>()))))
 		{
-			asAtomHandler::as<AVM1Function>(func)->call(&ret,&obj,nullptr,0);
-			result=true;
+			m.name_s_id=BUILTIN_STRINGS::STRING_ONROLLOUT;
+			AVM1getVariableByMultiname(func,m);
+			if (asAtomHandler::is<AVM1Function>(func))
+			{
+				asAtomHandler::as<AVM1Function>(func)->call(&ret,&obj,nullptr,0);
+				result=true;
+			}
 		}
 	}
 	else if (e->type == "mouseOver" || e->type == "mouseOut")
@@ -2711,7 +2732,7 @@ std::string asAtomHandler::toDebugString(asAtom& a)
 		case ATOM_NUMBERPTR:
 		{
 			std::string ret = Number::toString(toNumber(a))+"d";
-#ifndef _NDEBUG
+#ifndef NDEBUG
 			assert(getObject(a));
 			char buf[300];
 			sprintf(buf,"(%p / %d/%d)",getObject(a),getObject(a)->getRefCount(),getObject(a)->getConstant());
@@ -2794,8 +2815,8 @@ bool asAtomHandler::isTypelate(asAtom& a,ASObject *type)
 	LOG_CALL(_("isTypelate"));
 	bool real_ret=false;
 
-	Class_base* objc=NULL;
-	Class_base* c=NULL;
+	Class_base* objc=nullptr;
+	Class_base* c=nullptr;
 	switch (type->getObjectType())
 	{
 		case T_INTEGER:
@@ -2853,6 +2874,69 @@ bool asAtomHandler::isTypelate(asAtom& a,ASObject *type)
 	return real_ret;
 }
 
+bool asAtomHandler::isTypelate(asAtom& a,asAtom& t)
+{
+	LOG_CALL(_("isTypelate"));
+	bool real_ret=false;
+
+	Class_base* objc=nullptr;
+	Class_base* c=nullptr;
+	switch (asAtomHandler::getObjectType(t))
+	{
+		case T_INTEGER:
+		case T_UINTEGER:
+		case T_NUMBER:
+		case T_OBJECT:
+		case T_STRING:
+			LOG(LOG_ERROR,"trying to call isTypelate on object:"<<toDebugString(a));
+			throwError<TypeError>(kIsTypeMustBeClassError);
+			break;
+		case T_NULL:
+			LOG(LOG_ERROR,"trying to call isTypelate on null:"<<toDebugString(a));
+			throwError<TypeError>(kConvertNullToObjectError);
+			break;
+		case T_UNDEFINED:
+			LOG(LOG_ERROR,"trying to call isTypelate on undefined:"<<toDebugString(a));
+			throwError<TypeError>(kConvertUndefinedToObjectError);
+			break;
+		case T_CLASS:
+			break;
+		default:
+			throwError<TypeError>(kIsTypeMustBeClassError);
+	}
+
+	c=asAtomHandler::as<Class_base>(t);
+	//Special case numeric types
+	if(isNumeric(a))
+	{
+		if(c==Class<Number>::getClass(c->getSystemState()) || c==c->getSystemState()->getObjectClassRef())
+			real_ret=true;
+		else if(c==Class<Integer>::getClass(c->getSystemState()))
+			real_ret=(toNumber(a)==toInt(a));
+		else if(c==Class<UInteger>::getClass(c->getSystemState()))
+			real_ret=(toNumber(a)==toUInt(a));
+		else
+			real_ret=false;
+		LOG_CALL(_("Numeric type is ") << ((real_ret)?"":_("not ")) << _("subclass of ") << c->class_name);
+		c->decRef();
+		return real_ret;
+	}
+
+	objc = getClass(a,c->getSystemState(),false);
+	if(!objc)
+	{
+		real_ret=getObjectType(a)==asAtomHandler::getObjectType(t);
+		LOG_CALL(_("isTypelate on non classed object ") << real_ret);
+		c->decRef();
+		return real_ret;
+	}
+
+	real_ret=objc->isSubClass(c);
+	LOG_CALL(_("Type ") << objc->class_name << _(" is ") << ((real_ret)?"":_("not ")) 
+			<< "subclass of " << c->class_name);
+	c->decRef();
+	return real_ret;
+}
 
 tiny_string asAtomHandler::toString(const asAtom& a,SystemState* sys)
 {
@@ -3071,8 +3155,8 @@ bool asAtomHandler::add(asAtom& a,asAtom &v2, SystemState* sys,bool forceint)
 			}
 			else
 			{//Convert both to numbers and add
-				number_t num1=AVM1toNumber(val1p,sys->mainClip->usesActionScript3);
-				number_t num2=AVM1toNumber(val2p,sys->mainClip->usesActionScript3);
+				number_t num1=AVM1toNumber(val1p,sys->getSwfVersion());
+				number_t num2=AVM1toNumber(val2p,sys->getSwfVersion());
 				LOG_CALL("addN " << num1 << '+' << num2);
 				number_t result = num1 + num2;
 				if (forceint)
@@ -3184,8 +3268,8 @@ void asAtomHandler::addreplace(asAtom& ret, SystemState* sys,asAtom& v1, asAtom 
 			}
 			else
 			{//Convert both to numbers and add
-				number_t num1=AVM1toNumber(val1p,sys->mainClip->usesActionScript3);
-				number_t num2=AVM1toNumber(val2p,sys->mainClip->usesActionScript3);
+				number_t num1=AVM1toNumber(val1p,sys->getSwfVersion());
+				number_t num2=AVM1toNumber(val2p,sys->getSwfVersion());
 				LOG_CALL("addN " << num1 << '+' << num2);
 				ASObject* o = getObject(ret);
 				if (forceint)

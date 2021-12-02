@@ -34,6 +34,7 @@ void ContentElement::sinit(Class_base* c)
 	CLASS_SETUP(c, ASObject, _constructorNotInstantiatable, CLASS_SEALED);
 	REGISTER_GETTER(c,rawText);
 	REGISTER_GETTER_SETTER(c,elementFormat);
+	c->setVariableAtomByQName("GRAPHIC_ELEMENT",nsNameAndKind(),asAtomHandler::fromUInt(0xFDEF),CONSTANT_TRAIT);
 }
 ASFUNCTIONBODY_GETTER_SETTER(ContentElement,elementFormat)
 ASFUNCTIONBODY_GETTER(ContentElement,rawText)
@@ -462,8 +463,8 @@ ASFUNCTIONBODY_ATOM(TextBlock, recreateTextLine)
 	{
 		throwError<ArgumentError>(kInvalidArgumentError,"Invalid argument: textLine is in different textBlock");
 	}
-	if (fitSomething && textLine->text == "")
-		textLine->text = " ";
+	if (fitSomething && textLine->getText().empty())
+		textLine->setText(" ");
 	textLine->width = (uint32_t)width;
 	textLine->previousLine = previousLine;
 	textLine->updateSizes();
@@ -584,13 +585,13 @@ ASFUNCTIONBODY_ATOM(GroupElement,_constructor)
 }
 
 TextLine::TextLine(Class_base* c, tiny_string linetext, _NR<TextBlock> owner)
-  : DisplayObjectContainer(c), TextData(),nextLine(NULL),previousLine(NULL),userData(NULL)
+  : DisplayObjectContainer(c), TextData(),nextLine(nullptr),previousLine(nullptr),userData(nullptr)
   ,hasGraphicElement(false),hasTabs(false),rawTextLength(0),specifiedWidth(0),textBlockBeginIndex(0)
 {
 	subtype = SUBTYPE_TEXTLINE;
 	textBlock = owner;
 
-	text = linetext;
+	setText(linetext.raw_buf());
 	updateSizes();
 	requestInvalidation(getSys());
 }
@@ -701,15 +702,22 @@ bool TextLine::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, number
 
 void TextLine::requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh)
 {
+	if (requestInvalidationForCacheAsBitmap(q))
+		return;
 	DisplayObjectContainer::requestInvalidation(q,forceTextureRefresh);
 	incRef();
 	q->addToInvalidateQueue(_MR(this));
 }
 
-IDrawable* TextLine::invalidate(DisplayObject* target, const MATRIX& initialMatrix,bool smoothing)
+IDrawable* TextLine::invalidate(DisplayObject* target, const MATRIX& initialMatrix,bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap)
 {
-	int32_t x,y,rx,ry;
-	uint32_t width,height,rwidth,rheight;
+	if (cachedBitmap && computeCacheAsBitmap())
+	{
+		setNeedsTextureRecalculation();
+		return getCachedBitmapDrawable(target, initialMatrix, cachedBitmap);
+	}
+	number_t x,y,rx,ry;
+	number_t width,height,rwidth,rheight;
 	number_t bxmin,bxmax,bymin,bymax;
 	if(boundsRect(bxmin,bxmax,bymin,bymax)==false)
 	{
@@ -719,14 +727,14 @@ IDrawable* TextLine::invalidate(DisplayObject* target, const MATRIX& initialMatr
 
 	//Compute the matrix and the masks that are relevant
 	bool isMask;
-	bool hasMask;
+	_NR<DisplayObject> mask;
 	MATRIX totalMatrix;
 	std::vector<IDrawable::MaskData> masks;
-	computeMasksAndMatrix(target,masks,totalMatrix,false,isMask,hasMask);
+	computeMasksAndMatrix(target,masks,totalMatrix,false,isMask,mask);
 	totalMatrix=initialMatrix.multiplyMatrix(totalMatrix);
 	computeBoundsForTransformedRect(bxmin,bxmax,bymin,bymax,x,y,width,height,totalMatrix);
 	MATRIX totalMatrix2;
-	computeMasksAndMatrix(target,masks,totalMatrix2,true,isMask,hasMask);
+	computeMasksAndMatrix(target,masks,totalMatrix2,true,isMask,mask);
 	totalMatrix2=initialMatrix.multiplyMatrix(totalMatrix2);
 	computeBoundsForTransformedRect(bxmin,bxmax,bymin,bymax,rx,ry,rwidth,rheight,totalMatrix2);
 	if(width==0 || height==0)
@@ -734,14 +742,14 @@ IDrawable* TextLine::invalidate(DisplayObject* target, const MATRIX& initialMatr
 
 	float rotation = getConcatenatedMatrix().getRotation();
 	return new CairoPangoRenderer(*this, totalMatrix,
-				x, y, width, height,
-				rx, ry, rwidth, rheight,rotation,
+				x, y, ceil(width), ceil(height),
+				rx, ry, ceil(rwidth), ceil(rheight), rotation,
 				totalMatrix.getScaleX(),totalMatrix.getScaleY(),
-				isMask,hasMask,
+				isMask,mask,
 				1.0f,getConcatenatedAlpha(),masks,
 				1.0f,1.0f,1.0f,1.0f,
 				0.0f,0.0f,0.0f,0.0f,
-				smoothing,bxmin,bymin,0);
+				smoothing,0);
 }
 
 bool TextLine::renderImpl(RenderContext& ctxt) const

@@ -84,25 +84,25 @@ void LoaderInfo::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, EventDispatcher, _constructor, CLASS_SEALED);
 	c->isReusable = true;
-	c->setDeclaredMethodByQName("loaderURL","",Class<IFunction>::getFunction(c->getSystemState(),_getLoaderURL),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("loader","",Class<IFunction>::getFunction(c->getSystemState(),_getLoader),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("content","",Class<IFunction>::getFunction(c->getSystemState(),_getContent),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("url","",Class<IFunction>::getFunction(c->getSystemState(),_getURL),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("bytesLoaded","",Class<IFunction>::getFunction(c->getSystemState(),_getBytesLoaded),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("bytesTotal","",Class<IFunction>::getFunction(c->getSystemState(),_getBytesTotal),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("bytes","",Class<IFunction>::getFunction(c->getSystemState(),_getBytes),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("applicationDomain","",Class<IFunction>::getFunction(c->getSystemState(),_getApplicationDomain),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("sharedEvents","",Class<IFunction>::getFunction(c->getSystemState(),_getSharedEvents),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("width","",Class<IFunction>::getFunction(c->getSystemState(),_getWidth),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("height","",Class<IFunction>::getFunction(c->getSystemState(),_getHeight),GETTER_METHOD,true);
-	REGISTER_GETTER(c,parameters);
-	REGISTER_GETTER(c,actionScriptVersion);
-	REGISTER_GETTER(c,swfVersion);
-	REGISTER_GETTER(c,childAllowsParent);
-	REGISTER_GETTER(c,contentType);
-	REGISTER_GETTER(c,uncaughtErrorEvents);
-	REGISTER_GETTER(c,parentAllowsChild);
-	REGISTER_GETTER(c,frameRate);
+	c->setDeclaredMethodByQName("loaderURL","",Class<IFunction>::getFunction(c->getSystemState(),_getLoaderURL,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("loader","",Class<IFunction>::getFunction(c->getSystemState(),_getLoader,0,Class<Loader>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("content","",Class<IFunction>::getFunction(c->getSystemState(),_getContent,0,Class<DisplayObject>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("url","",Class<IFunction>::getFunction(c->getSystemState(),_getURL,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("bytesLoaded","",Class<IFunction>::getFunction(c->getSystemState(),_getBytesLoaded,0,Class<UInteger>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("bytesTotal","",Class<IFunction>::getFunction(c->getSystemState(),_getBytesTotal,0,Class<UInteger>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("bytes","",Class<IFunction>::getFunction(c->getSystemState(),_getBytes,0,Class<ByteArray>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("applicationDomain","",Class<IFunction>::getFunction(c->getSystemState(),_getApplicationDomain,0,Class<ApplicationDomain>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("sharedEvents","",Class<IFunction>::getFunction(c->getSystemState(),_getSharedEvents,0,Class<EventDispatcher>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("width","",Class<IFunction>::getFunction(c->getSystemState(),_getWidth,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("height","",Class<IFunction>::getFunction(c->getSystemState(),_getHeight,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	REGISTER_GETTER_RESULTTYPE(c,parameters,ASObject);
+	REGISTER_GETTER_RESULTTYPE(c,actionScriptVersion,UInteger);
+	REGISTER_GETTER_RESULTTYPE(c,swfVersion,UInteger);
+	REGISTER_GETTER_RESULTTYPE(c,childAllowsParent,Boolean);
+	REGISTER_GETTER_RESULTTYPE(c,contentType,ASString);
+	REGISTER_GETTER_RESULTTYPE(c,uncaughtErrorEvents,UncaughtErrorEvents);
+	REGISTER_GETTER_RESULTTYPE(c,parentAllowsChild,Boolean);
+	REGISTER_GETTER_RESULTTYPE(c,frameRate,Number);
 }
 
 ASFUNCTIONBODY_GETTER(LoaderInfo,parameters);
@@ -242,8 +242,8 @@ void LoaderInfo::objectHasLoaded(_R<DisplayObject> obj)
 	if(!loader.isNull() && obj==waitedObject)
 		loader->setContent(obj);
 
-	if (!loader.isNull() && !loader->getParent()) // loader has no parent, ensure init/complete events are sended anyway
-		loader->getSystemState()->stage->addHiddenObject(waitedObject);
+	if (!loader.isNull() && !loader->getParent() && waitedObject->is<MovieClip>()) // loader has no parent, ensure init/complete events are sended anyway
+		loader->getSystemState()->stage->addHiddenObject(waitedObject->as<MovieClip>());
 		
 	waitedObject.reset();
 }
@@ -337,7 +337,7 @@ ASFUNCTIONBODY_ATOM(LoaderInfo,_getBytes)
 
 	if (th->bytesData.isNull())
 		th->bytesData = _NR<ByteArray>(Class<ByteArray>::getInstanceS(sys));
-	if (!th->loader->getContent().isNull())
+	if (!th->loader.isNull() && !th->loader->getContent().isNull())
 		th->bytesData->writeObject(th->loader->getContent().getPtr());
 
 	ret = asAtomHandler::fromObject(th->bytesData.getPtr());
@@ -462,6 +462,13 @@ void LoaderThread::execute()
 		loaderInfo->setBytesLoaded(bytes->getLength());
 
 		sbuf = new bytes_buf(bytes->bytes,bytes->getLength());
+
+// extract embedded swf to separate file
+//		char* name_used=nullptr;
+//		int fd = g_file_open_tmp("lightsparkXXXXXX.swf",&name_used,nullptr);
+//		write(fd,bytes->bytes,bytes->getLength());
+//		close(fd);
+//		g_free(name_used);
 	}
 
 	istream s(sbuf);
@@ -737,14 +744,14 @@ Loader::~Loader()
 void Loader::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, DisplayObjectContainer, _constructor, CLASS_SEALED);
-	c->setDeclaredMethodByQName("contentLoaderInfo","",Class<IFunction>::getFunction(c->getSystemState(),_getContentLoaderInfo),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("content","",Class<IFunction>::getFunction(c->getSystemState(),_getContent),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("contentLoaderInfo","",Class<IFunction>::getFunction(c->getSystemState(),_getContentLoaderInfo,0,Class<LoaderInfo>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("content","",Class<IFunction>::getFunction(c->getSystemState(),_getContent,0,Class<DisplayObject>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 	c->setDeclaredMethodByQName("close","",Class<IFunction>::getFunction(c->getSystemState(),close),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("loadBytes","",Class<IFunction>::getFunction(c->getSystemState(),loadBytes),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("load","",Class<IFunction>::getFunction(c->getSystemState(),load),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("unload","",Class<IFunction>::getFunction(c->getSystemState(),_unload),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("unloadAndStop","",Class<IFunction>::getFunction(c->getSystemState(),_unloadAndStop),NORMAL_METHOD,true);
-	REGISTER_GETTER(c,uncaughtErrorEvents);
+	REGISTER_GETTER_RESULTTYPE(c,uncaughtErrorEvents,UncaughtErrorEvents);
 }
 
 ASFUNCTIONBODY_GETTER(Loader,uncaughtErrorEvents);
@@ -798,7 +805,7 @@ void Loader::setContent(_R<DisplayObject> o)
 		o->loaderInfo->setComplete();
 }
 
-Sprite::Sprite(Class_base* c):DisplayObjectContainer(c),TokenContainer(this, this->getSystemState()->spriteTokenMemory),graphics(NullRef),soundstartframe(UINT32_MAX),streamingsound(false),dragged(false),buttonMode(false),useHandCursor(false)
+Sprite::Sprite(Class_base* c):DisplayObjectContainer(c),TokenContainer(this),graphics(NullRef),soundstartframe(UINT32_MAX),streamingsound(false),hasMouse(false),dragged(false),buttonMode(false),useHandCursor(true)
 {
 	subtype=SUBTYPE_SPRITE;
 }
@@ -811,8 +818,9 @@ bool Sprite::destruct()
 	hitTarget.reset();
 	dragged = false;
 	buttonMode = false;
-	useHandCursor = false;
+	useHandCursor = true;
 	streamingsound=false;
+	hasMouse=false;
 	tokens.clear();
 	return DisplayObjectContainer::destruct();
 }
@@ -827,25 +835,47 @@ void Sprite::finalize()
 	DisplayObjectContainer::finalize();
 }
 
+void Sprite::startDrawJob()
+{
+	if (graphics)
+		graphics->startDrawJob();
+}
+
+void Sprite::endDrawJob()
+{
+	if (graphics)
+		graphics->endDrawJob();
+}
+
 void Sprite::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, DisplayObjectContainer, _constructor, CLASS_SEALED);
 	c->isReusable = true;
-	c->setDeclaredMethodByQName("graphics","",Class<IFunction>::getFunction(c->getSystemState(),_getGraphics),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("graphics","",Class<IFunction>::getFunction(c->getSystemState(),_getGraphics,0,Class<Graphics>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 	c->setDeclaredMethodByQName("startDrag","",Class<IFunction>::getFunction(c->getSystemState(),_startDrag),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("stopDrag","",Class<IFunction>::getFunction(c->getSystemState(),_stopDrag),NORMAL_METHOD,true);
-	REGISTER_GETTER_SETTER(c, buttonMode);
-	REGISTER_GETTER_SETTER(c, hitArea);
-	REGISTER_GETTER_SETTER(c, useHandCursor);
-	c->setDeclaredMethodByQName("soundTransform","",Class<IFunction>::getFunction(c->getSystemState(),getSoundTransform),GETTER_METHOD,true);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c, buttonMode,Boolean);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c, hitArea,Sprite);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c, useHandCursor,Boolean);
+	c->setDeclaredMethodByQName("soundTransform","",Class<IFunction>::getFunction(c->getSystemState(),getSoundTransform,0,Class<SoundTransform>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 	c->setDeclaredMethodByQName("soundTransform","",Class<IFunction>::getFunction(c->getSystemState(),setSoundTransform),SETTER_METHOD,true);
 }
 
-ASFUNCTIONBODY_GETTER_SETTER_NOT_IMPLEMENTED(Sprite, buttonMode);
-ASFUNCTIONBODY_GETTER_SETTER_NOT_IMPLEMENTED(Sprite, useHandCursor);
+ASFUNCTIONBODY_GETTER_SETTER(Sprite, buttonMode);
+ASFUNCTIONBODY_GETTER_SETTER_CB(Sprite, useHandCursor,afterSetUseHandCursor);
+
+void Sprite::afterSetUseHandCursor(bool /*oldValue*/)
+{
+	handleMouseCursor(hasMouse);
+}
 
 void Sprite::buildTraits(ASObject* o)
 {
+}
+
+IDrawable* Sprite::invalidate(DisplayObject* target, const MATRIX& initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap)
+{
+	return TokenContainer::invalidate(target, initialMatrix,smoothing,q,cachedBitmap,true);
 }
 
 ASFUNCTIONBODY_ATOM(Sprite,_startDrag)
@@ -983,6 +1013,8 @@ bool Sprite::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, number_t
 
 void Sprite::requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh)
 {
+	if (requestInvalidationForCacheAsBitmap(q))
+		return;
 	DisplayObjectContainer::requestInvalidation(q,forceTextureRefresh);
 	TokenContainer::requestInvalidation(q,forceTextureRefresh);
 }
@@ -990,6 +1022,13 @@ void Sprite::requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh)
 bool DisplayObjectContainer::renderImpl(RenderContext& ctxt) const
 {
 	bool renderingfailed = false;
+	if (computeCacheAsBitmap() && ctxt.contextType == RenderContext::GL)
+	{
+		_NR<DisplayObject> d=getCachedBitmap(); // this ensures bitmap is not destructed during rendering
+		if (d)
+			d->Render(ctxt);
+		return renderingfailed;
+	}
 	Locker l(mutexDisplayList);
 	//Now draw also the display list
 	std::vector<_R<DisplayObject>>::const_iterator it=dynamicDisplayList.begin();
@@ -1082,11 +1121,19 @@ _NR<DisplayObject> DisplayObjectContainer::hitTestImpl(_NR<DisplayObject> last, 
 				ret = _MNR(this);
 				return ret;
 			}
+			if (interactiveObjectsOnly && !(*j)->is<InteractiveObject>())
+			{
+				// we have hit a non-interactive object, so "this" may be the hit target
+				// but we continue to search the children as there may be an InteractiveObject that is also hit
+				this->incRef();
+				ret = _MNR(this);
+				continue;
+			}
 			break;
 		}
 	}
 	// only check interactive objects
-	if(ret && interactiveObjectsOnly && !ret->is<InteractiveObject>())
+	if(ret && interactiveObjectsOnly && !ret->is<InteractiveObject>() && mouseChildren)
 		ret.reset();
 	
 	/* When mouseChildren is false, we should get all events of our children */
@@ -1164,7 +1211,7 @@ void Sprite::appendSound(unsigned char *buf, int len, uint32_t frame)
 
 void Sprite::checkSound(uint32_t frame)
 {
-	if (sound && !sound->isPlaying() && streamingsound && soundstartframe==frame)
+	if (sound && streamingsound && soundstartframe==frame)
 		sound->play();
 }
 
@@ -1192,6 +1239,21 @@ _NR<Graphics> Sprite::getGraphics()
 	if(graphics.isNull())
 		graphics=_MR(Class<Graphics>::getInstanceS(getSystemState(),this));
 	return graphics;
+}
+
+void Sprite::handleMouseCursor(bool rollover)
+{
+	if (rollover)
+	{
+		hasMouse=true;
+		if (buttonMode)
+			getSystemState()->setMouseHandCursor(this->useHandCursor);
+	}
+	else
+	{
+		getSystemState()->setMouseHandCursor(false);
+		hasMouse=false;
+	}
 }
 
 ASFUNCTIONBODY_ATOM(Sprite,_getGraphics)
@@ -1271,9 +1333,9 @@ Scene::Scene(Class_base* c, const Scene_data& data, uint32_t _numFrames):ASObjec
 void Scene::sinit(Class_base* c)
 {
 	CLASS_SETUP_NO_CONSTRUCTOR(c, ASObject, CLASS_SEALED | CLASS_FINAL);
-	c->setDeclaredMethodByQName("labels","",Class<IFunction>::getFunction(c->getSystemState(),_getLabels),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("name","",Class<IFunction>::getFunction(c->getSystemState(),_getName),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("numFrames","",Class<IFunction>::getFunction(c->getSystemState(),_getNumFrames),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("labels","",Class<IFunction>::getFunction(c->getSystemState(),_getLabels,0,Class<Array>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("name","",Class<IFunction>::getFunction(c->getSystemState(),_getName,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("numFrames","",Class<IFunction>::getFunction(c->getSystemState(),_getNumFrames,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 }
 
 ASFUNCTIONBODY_ATOM(Scene,_getLabels)
@@ -1369,14 +1431,14 @@ void MovieClip::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, Sprite, _constructor, CLASS_DYNAMIC_NOT_FINAL);
 	c->isReusable = true;
-	c->setDeclaredMethodByQName("currentFrame","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentFrame),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("totalFrames","",Class<IFunction>::getFunction(c->getSystemState(),_getTotalFrames),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("framesLoaded","",Class<IFunction>::getFunction(c->getSystemState(),_getFramesLoaded),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("currentFrameLabel","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentFrameLabel),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("currentLabel","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentLabel),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("currentLabels","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentLabels),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("scenes","",Class<IFunction>::getFunction(c->getSystemState(),_getScenes),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("currentScene","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentScene),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("currentFrame","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentFrame,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("totalFrames","",Class<IFunction>::getFunction(c->getSystemState(),_getTotalFrames,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("framesLoaded","",Class<IFunction>::getFunction(c->getSystemState(),_getFramesLoaded,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("currentFrameLabel","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentFrameLabel,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("currentLabel","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentLabel,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("currentLabels","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentLabels,0,Class<Array>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("scenes","",Class<IFunction>::getFunction(c->getSystemState(),_getScenes,0,Class<Array>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("currentScene","",Class<IFunction>::getFunction(c->getSystemState(),_getCurrentScene,0,Class<Scene>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
 	c->setDeclaredMethodByQName("stop","",Class<IFunction>::getFunction(c->getSystemState(),stop),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("play","",Class<IFunction>::getFunction(c->getSystemState(),play),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("gotoAndStop","",Class<IFunction>::getFunction(c->getSystemState(),gotoAndStop),NORMAL_METHOD,true);
@@ -1384,7 +1446,7 @@ void MovieClip::sinit(Class_base* c)
 	c->setDeclaredMethodByQName("prevFrame","",Class<IFunction>::getFunction(c->getSystemState(),prevFrame),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("nextFrame","",Class<IFunction>::getFunction(c->getSystemState(),nextFrame),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("addFrameScript","",Class<IFunction>::getFunction(c->getSystemState(),addFrameScript),NORMAL_METHOD,true);
-	REGISTER_GETTER_SETTER(c, enabled);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c, enabled,Boolean);
 }
 
 ASFUNCTIONBODY_GETTER_SETTER(MovieClip, enabled);
@@ -1408,6 +1470,7 @@ MovieClip::MovieClip(Class_base* c, const FrameContainer& f, uint32_t defineSpri
 
 bool MovieClip::destruct()
 {
+	getSystemState()->stage->removeHiddenObject(this);
 	frames.clear();
 	setFramesLoaded(0);
 	auto it = frameScripts.begin();
@@ -1562,8 +1625,14 @@ ASFUNCTIONBODY_ATOM(MovieClip,stop)
 ASFUNCTIONBODY_ATOM(MovieClip,play)
 {
 	MovieClip* th=asAtomHandler::as<MovieClip>(obj);
-	th->state.stop_FP=false;
-	th->advanceFrame();
+	if (th->state.stop_FP)
+	{
+		th->state.stop_FP=false;
+		if (th->isOnStage())
+			th->advanceFrame();
+		else
+			th->getSystemState()->stage->addHiddenObject(th);
+	}
 }
 
 void MovieClip::gotoAnd(asAtom* args, const unsigned int argslen, bool stop)
@@ -1617,10 +1686,15 @@ void MovieClip::gotoAnd(asAtom* args, const unsigned int argslen, bool stop)
 
 	if (!this->isOnStage())
 	{
-		advanceFrame();
-		initFrame();
-		this->incRef();
-		this->getSystemState()->currentVm->addEvent(NullRef, _MR(new (this->getSystemState()->unaccountedMemory) ExecuteFrameScriptEvent(_MR(this))));
+		if (stop)
+		{
+			advanceFrame();
+			initFrame();
+			this->incRef();
+			this->getSystemState()->currentVm->addEvent(NullRef, _MR(new (this->getSystemState()->unaccountedMemory) ExecuteFrameScriptEvent(_MR(this))));
+		}
+		else
+			this->getSystemState()->stage->addHiddenObject(this);
 	}
 	else if (state.creatingframe) // this can occur if we are between the advanceFrame and the initFrame calls (that means we are currently executing an enterFrame event)
 		advanceFrame();
@@ -1673,8 +1747,9 @@ ASFUNCTIONBODY_ATOM(MovieClip,nextFrame)
 {
 	MovieClip* th=asAtomHandler::as<MovieClip>(obj);
 	assert_and_throw(th->state.FP<th->getFramesLoaded());
-	th->state.next_FP = th->state.FP+1;
+	th->state.next_FP = th->state.FP == th->getFramesLoaded()-1 ? th->state.FP : th->state.FP+1;
 	th->state.explicit_FP=true;
+	th->state.stop_FP=true;
 	if (th->inExecuteFramescript)
 		return; // we are currently executing a framescript, so advancing to the new frame will be done through the normal SystemState tick;
 	if (!th->isOnStage())
@@ -1693,8 +1768,9 @@ ASFUNCTIONBODY_ATOM(MovieClip,prevFrame)
 {
 	MovieClip* th=asAtomHandler::as<MovieClip>(obj);
 	assert_and_throw(th->state.FP<th->getFramesLoaded());
-	th->state.next_FP = th->state.FP-1;
+	th->state.next_FP = th->state.FP == 0 ? th->state.FP : th->state.FP-1;
 	th->state.explicit_FP=true;
+	th->state.stop_FP=true;
 	if (th->inExecuteFramescript)
 		return; // we are currently executing a framescript, so advancing to the new frame will be done through the normal SystemState tick;
 	if (!th->isOnStage())
@@ -1899,7 +1975,6 @@ bool MovieClip::AVM1HandleMouseEvent(EventDispatcher *dispatcher, MouseEvent *e)
 				// mouseUp/mouseDown/mouseMove events are sent to all MovieClips on the Stage
 				if( (e->type == "mouseDown" && it->EventFlags.ClipEventMouseDown)
 					|| (e->type == "mouseUp" && it->EventFlags.ClipEventMouseUp)
-					|| (e->type == "mouseDown" && it->EventFlags.ClipEventPress)
 					|| (e->type == "mouseMove" && it->EventFlags.ClipEventMouseMove)
 					)
 				{
@@ -1907,7 +1982,8 @@ bool MovieClip::AVM1HandleMouseEvent(EventDispatcher *dispatcher, MouseEvent *e)
 					ACTIONRECORD::executeActions(this,this->getCurrentFrame()->getAVM1Context(),it->actions,it->startactionpos,m);
 				}
 				if( dispobj &&
-					((e->type == "click" && it->EventFlags.ClipEventRelease)
+					((e->type == "mouseUp" && it->EventFlags.ClipEventRelease)
+					|| (e->type == "mouseDown" && it->EventFlags.ClipEventPress)
 					|| (e->type == "rollOver" && it->EventFlags.ClipEventRollOver)
 					|| (e->type == "rollOut" && it->EventFlags.ClipEventRollOut)
 					|| (e->type == "releaseOutside" && it->EventFlags.ClipEventReleaseOutside)
@@ -2158,7 +2234,7 @@ ASFUNCTIONBODY_ATOM(MovieClip,AVM1CreateEmptyMovieClip)
 ASFUNCTIONBODY_ATOM(MovieClip,AVM1RemoveMovieClip)
 {
 	MovieClip* th=asAtomHandler::as<MovieClip>(obj);
-	if (th->getParent() && !th->legacy && !th->is<RootMovieClip>())
+	if (th->getParent() && !th->is<RootMovieClip>())
 	{
 		if (th->name != BUILTIN_STRINGS::EMPTY)
 		{
@@ -2282,7 +2358,7 @@ ASFUNCTIONBODY_ATOM(MovieClip,AVM1AttachBitmap)
 		throw RunTimeException("AVM1: attachBitmap first parameter is no BitmapData");
 	}
 
-	BitmapData* data = asAtomHandler::as<BitmapData>(args[0]);
+	AVM1BitmapData* data = asAtomHandler::as<AVM1BitmapData>(args[0]);
 	data->incRef();
 	Bitmap* toAdd = Class<AVM1Bitmap>::getInstanceS(sys,_MR(data));
 	if (argslen > 2)
@@ -2328,7 +2404,7 @@ ASFUNCTIONBODY_ATOM(MovieClip,AVM1LoadMovie)
 ASFUNCTIONBODY_ATOM(MovieClip,AVM1UnloadMovie)
 {
 	MovieClip* th=asAtomHandler::as<MovieClip>(obj);
-	th->setOnStage(false);
+	th->setOnStage(false,false);
 	th->tokens.clear();
 }
 ASFUNCTIONBODY_ATOM(MovieClip,AVM1CreateTextField)
@@ -2370,21 +2446,21 @@ void DisplayObjectContainer::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, InteractiveObject, _constructor, CLASS_SEALED);
 	c->isReusable = true;
-	c->setDeclaredMethodByQName("numChildren","",Class<IFunction>::getFunction(c->getSystemState(),_getNumChildren),GETTER_METHOD,true);
-	c->setDeclaredMethodByQName("getChildIndex","",Class<IFunction>::getFunction(c->getSystemState(),_getChildIndex),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("numChildren","",Class<IFunction>::getFunction(c->getSystemState(),_getNumChildren,0,Class<Integer>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+	c->setDeclaredMethodByQName("getChildIndex","",Class<IFunction>::getFunction(c->getSystemState(),_getChildIndex,1,Class<Integer>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("setChildIndex","",Class<IFunction>::getFunction(c->getSystemState(),_setChildIndex),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("getChildAt","",Class<IFunction>::getFunction(c->getSystemState(),getChildAt),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("getChildByName","",Class<IFunction>::getFunction(c->getSystemState(),getChildByName),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("getObjectsUnderPoint","",Class<IFunction>::getFunction(c->getSystemState(),getObjectsUnderPoint),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("addChild","",Class<IFunction>::getFunction(c->getSystemState(),addChild),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("removeChild","",Class<IFunction>::getFunction(c->getSystemState(),removeChild),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("removeChildAt","",Class<IFunction>::getFunction(c->getSystemState(),removeChildAt),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("getChildAt","",Class<IFunction>::getFunction(c->getSystemState(),getChildAt,1,Class<DisplayObject>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("getChildByName","",Class<IFunction>::getFunction(c->getSystemState(),getChildByName,1,Class<DisplayObject>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("getObjectsUnderPoint","",Class<IFunction>::getFunction(c->getSystemState(),getObjectsUnderPoint,1,Class<Array>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("addChild","",Class<IFunction>::getFunction(c->getSystemState(),addChild,1,Class<DisplayObject>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("removeChild","",Class<IFunction>::getFunction(c->getSystemState(),removeChild,1,Class<DisplayObject>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("removeChildAt","",Class<IFunction>::getFunction(c->getSystemState(),removeChildAt,1,Class<DisplayObject>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("removeChildren","",Class<IFunction>::getFunction(c->getSystemState(),removeChildren),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("addChildAt","",Class<IFunction>::getFunction(c->getSystemState(),addChildAt),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("addChildAt","",Class<IFunction>::getFunction(c->getSystemState(),addChildAt,2,Class<DisplayObject>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("swapChildren","",Class<IFunction>::getFunction(c->getSystemState(),swapChildren),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("swapChildrenAt","",Class<IFunction>::getFunction(c->getSystemState(),swapChildrenAt),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("contains","",Class<IFunction>::getFunction(c->getSystemState(),contains),NORMAL_METHOD,true);
-	c->setDeclaredMethodByQName("mouseChildren","",Class<IFunction>::getFunction(c->getSystemState(),_setMouseChildren),SETTER_METHOD,true);
+	c->setDeclaredMethodByQName("mouseChildren","",Class<IFunction>::getFunction(c->getSystemState(),_setMouseChildren,0,Class<Boolean>::getRef(c->getSystemState()).getPtr()),SETTER_METHOD,true);
 	c->setDeclaredMethodByQName("mouseChildren","",Class<IFunction>::getFunction(c->getSystemState(),_getMouseChildren),GETTER_METHOD,true);
 	REGISTER_GETTER_SETTER(c, tabChildren);
 }
@@ -2634,11 +2710,7 @@ InteractiveObject::~InteractiveObject()
 
 ASFUNCTIONBODY_ATOM(InteractiveObject,_constructor)
 {
-	InteractiveObject* th=asAtomHandler::as<InteractiveObject>(obj);
 	EventDispatcher::_constructor(ret,sys,obj,nullptr,0);
-	//Object registered very early are not supported this way (Stage for example)
-	if(sys->getInputThread())
-		sys->getInputThread()->addListener(th);
 }
 
 ASFUNCTIONBODY_ATOM(InteractiveObject,_setMouseEnabled)
@@ -2669,8 +2741,6 @@ ASFUNCTIONBODY_ATOM(InteractiveObject,_getDoubleClickEnabled)
 
 bool InteractiveObject::destruct()
 {
-	if(getSystemState()->getInputThread())
-		getSystemState()->getInputThread()->removeListener(this);
 	contextMenu.reset();
 	mouseEnabled = true;
 	doubleClickEnabled =false;
@@ -2748,7 +2818,7 @@ void DisplayObjectContainer::dumpDisplayList(unsigned int level)
 		    " (" << pos.x << "," << pos.y << ") " <<
 		    (*it)->getNominalWidth() << "x" << (*it)->getNominalHeight() << " " <<
 		    ((*it)->isVisible() ? "v" : "") <<
-		    ((*it)->isMask() ? "m" : "") << " cd=" <<(*it)->ClipDepth<<" "<<
+		    ((*it)->isMask() ? "m" : "") << " cd=" <<(*it)->ClipDepth<<" "<<" ca=" <<(*it)->computeCacheAsBitmap()<<" "<<
 			"a=" << (*it)->clippedAlpha() <<" '"<<getSystemState()->getStringFromUniqueId((*it)->name)<<"' tag="<<(*it)->getTagID());
 
 		if ((*it)->is<DisplayObjectContainer>())
@@ -2813,6 +2883,8 @@ ASFUNCTIONBODY_ATOM(DisplayObjectContainer,_setMouseChildren)
 void DisplayObjectContainer::requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh)
 {
 	DisplayObject::requestInvalidation(q);
+	if (requestInvalidationForCacheAsBitmap(q))
+		return;
 	Locker l(mutexDisplayList);
 	std::vector<_R<DisplayObject>>::const_iterator it=dynamicDisplayList.begin();
 	for(;it!=dynamicDisplayList.end();++it)
@@ -2826,7 +2898,7 @@ void DisplayObjectContainer::_addChildAt(_R<DisplayObject> child, unsigned int i
 {
 	//If the child has no parent, set this container to parent
 	//If there is a previous parent, purge the child from his list
-	if(child->getParent())
+	if(child->getParent() && !getSystemState()->isInResetParentList(child.getPtr()))
 	{
 		//Child already in this container
 		if(child->getParent()==this)
@@ -2837,6 +2909,7 @@ void DisplayObjectContainer::_addChildAt(_R<DisplayObject> child, unsigned int i
 			child->getParent()->_removeChild(child.getPtr());
 		}
 	}
+	getSystemState()->removeFromResetParentList(child.getPtr());
 	child->setParent(this);
 	{
 		Locker l(mutexDisplayList);
@@ -2852,10 +2925,10 @@ void DisplayObjectContainer::_addChildAt(_R<DisplayObject> child, unsigned int i
 		}
 	}
 	if (!onStage || child.getPtr() != getSystemState()->mainClip)
-		child->setOnStage(onStage);
+		child->setOnStage(onStage,false);
 }
 
-bool DisplayObjectContainer::_removeChild(DisplayObject* child)
+bool DisplayObjectContainer::_removeChild(DisplayObject* child,bool direct)
 {
 	if(!child->getParent() || child->getParent()!=this)
 		return false;
@@ -2866,10 +2939,14 @@ bool DisplayObjectContainer::_removeChild(DisplayObject* child)
 		Locker l(mutexDisplayList);
 		std::vector<_R<DisplayObject>>::iterator it=find(dynamicDisplayList.begin(),dynamicDisplayList.end(),_MR(child));
 		if(it==dynamicDisplayList.end())
-			return false;
+			return getSystemState()->isInResetParentList(child);
 
-		child->setOnStage(false);
-		child->setParent(nullptr);
+		child->setOnStage(false,false);
+		child->incRef();
+		if (direct)
+			child->setParent(nullptr);
+		else
+			getSystemState()->addDisplayObjectToResetParentList(_MR(child));
 		child->setMask(NullRef);
 		
 		//Erase this from the legacy child map (if it is in there)
@@ -2892,8 +2969,8 @@ void DisplayObjectContainer::_removeAllChildren()
 	while (it!=dynamicDisplayList.end())
 	{
 		_R<DisplayObject> child = *it;
-		child->setOnStage(false);
-		child->setParent(nullptr);
+		child->setOnStage(false,false);
+		getSystemState()->addDisplayObjectToResetParentList(child);
 		child->setMask(NullRef);
 		if (!needsActionScript3())
 			child->removeAVM1Listeners();
@@ -3057,8 +3134,8 @@ ASFUNCTIONBODY_ATOM(DisplayObjectContainer,removeChildAt)
 			th->mapDepthToLegacyChild.erase(it2->second);
 			th->mapLegacyChildToDepth.erase(it2);
 		}
-		child->setOnStage(false);
-		child->setParent(nullptr);
+		child->setOnStage(false,false);
+		sys->addDisplayObjectToResetParentList(*it);
 		//incRef before the refrence is destroyed
 		child->incRef();
 		th->dynamicDisplayList.erase(it);
@@ -3299,12 +3376,12 @@ _NR<DisplayObject> Shape::hitTestImpl(NullableRef<DisplayObject> last, number_t 
 	return TokenContainer::hitTestImpl(interactiveObjectsOnly ? last : _NR<DisplayObject>(this),x-xmin,y-ymin, type);
 }
 
-Shape::Shape(Class_base* c):DisplayObject(c),TokenContainer(this, this->getSystemState()->shapeTokenMemory),graphics(NullRef),fromTag(nullptr)
+Shape::Shape(Class_base* c):DisplayObject(c),TokenContainer(this),graphics(NullRef),fromTag(nullptr)
 {
 }
 
 Shape::Shape(Class_base* c, float scaling, DefineShapeTag* tag):
-	DisplayObject(c),TokenContainer(this, this->getSystemState()->shapeTokenMemory, *tag->tokens, scaling),graphics(NullRef),fromTag(tag)
+	DisplayObject(c),TokenContainer(this, *tag->tokens, scaling),graphics(NullRef),fromTag(tag)
 {
 }
 
@@ -3338,6 +3415,18 @@ void Shape::finalize()
 	DisplayObject::finalize();
 }
 
+void Shape::startDrawJob()
+{
+	if (graphics)
+		graphics->startDrawJob();
+}
+
+void Shape::endDrawJob()
+{
+	if (graphics)
+		graphics->endDrawJob();
+}
+
 void Shape::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, DisplayObject, _constructor, CLASS_SEALED);
@@ -3345,13 +3434,9 @@ void Shape::sinit(Class_base* c)
 	c->setDeclaredMethodByQName("graphics","",Class<IFunction>::getFunction(c->getSystemState(),_getGraphics),GETTER_METHOD,true);
 }
 
-void Shape::buildTraits(ASObject* o)
+IDrawable *Shape::invalidate(DisplayObject *target, const MATRIX &initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap)
 {
-}
-
-IDrawable *Shape::invalidate(DisplayObject *target, const MATRIX &initialMatrix, bool smoothing)
-{
-	return TokenContainer::invalidate(target, initialMatrix,smoothing);
+	return TokenContainer::invalidate(target, initialMatrix,smoothing,q,cachedBitmap,!graphics.isNull());
 }
 
 ASFUNCTIONBODY_ATOM(Shape,_constructor)
@@ -3368,14 +3453,16 @@ ASFUNCTIONBODY_ATOM(Shape,_getGraphics)
 	ret = asAtomHandler::fromObject(th->graphics.getPtr());
 }
 
-MorphShape::MorphShape(Class_base* c):DisplayObject(c),TokenContainer(this, this->getSystemState()->morphShapeTokenMemory),morphshapetag(nullptr)
+MorphShape::MorphShape(Class_base* c):DisplayObject(c),TokenContainer(this),morphshapetag(nullptr),currentratio(0)
 {
 	scaling = 1.0f/20.0f;
 }
 
-MorphShape::MorphShape(Class_base *c, DefineMorphShapeTag* _morphshapetag):DisplayObject(c),TokenContainer(this, this->getSystemState()->morphShapeTokenMemory),morphshapetag(_morphshapetag)
+MorphShape::MorphShape(Class_base *c, DefineMorphShapeTag* _morphshapetag):DisplayObject(c),TokenContainer(this),morphshapetag(_morphshapetag),currentratio(0)
 {
 	scaling = 1.0f/20.0f;
+	if (this->morphshapetag)
+		this->morphshapetag->getTokensForRatio(tokens,0);
 }
 
 void MorphShape::sinit(Class_base* c)
@@ -3383,20 +3470,52 @@ void MorphShape::sinit(Class_base* c)
 	CLASS_SETUP_NO_CONSTRUCTOR(c, DisplayObject, CLASS_SEALED | CLASS_FINAL);
 }
 
-void MorphShape::buildTraits(ASObject* o)
+IDrawable* MorphShape::invalidate(DisplayObject* target, const MATRIX& initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap)
 {
-	//No traits
+	return TokenContainer::invalidate(target, initialMatrix,smoothing,q,cachedBitmap,false);
+}
+
+bool MorphShape::boundsRect(number_t &xmin, number_t &xmax, number_t &ymin, number_t &ymax) const
+{
+	if (!this->legacy || (morphshapetag==nullptr))
+		return TokenContainer::boundsRect(xmin,xmax,ymin,ymax);
+
+	float curratiofactor = float(currentratio)/65535.0;
+	xmin=(morphshapetag->StartBounds.Xmin + (float(morphshapetag->EndBounds.Xmin - morphshapetag->StartBounds.Xmin)*curratiofactor))/20.0;
+	xmax=(morphshapetag->StartBounds.Xmax + (float(morphshapetag->EndBounds.Xmax - morphshapetag->StartBounds.Xmax)*curratiofactor))/20.0;
+	ymin=(morphshapetag->StartBounds.Ymin + (float(morphshapetag->EndBounds.Ymin - morphshapetag->StartBounds.Ymin)*curratiofactor))/20.0;
+	ymax=(morphshapetag->StartBounds.Ymax + (float(morphshapetag->EndBounds.Ymax - morphshapetag->StartBounds.Ymax)*curratiofactor))/20.0;
+
+	return true;
+}
+
+_NR<DisplayObject> MorphShape::hitTestImpl(_NR<DisplayObject> last, number_t x, number_t y, HIT_TYPE type, bool interactiveObjectsOnly)
+{
+	number_t xmin, xmax, ymin, ymax;
+	boundsRect(xmin, xmax, ymin, ymax);
+	if (x<xmin || x>xmax || y<ymin || y>ymax)
+		return NullRef;
+	if (!interactiveObjectsOnly)
+		this->incRef();
+	return TokenContainer::hitTestImpl(interactiveObjectsOnly ? last : _NR<DisplayObject>(this),x-xmin,y-ymin, type);
 }
 
 void MorphShape::checkRatio(uint32_t ratio, bool inskipping)
 {
 	if (inskipping)
 		return;
-	TokenContainer::FromDefineMorphShapeTagToShapeVector(getSystemState(),this->morphshapetag,tokens,ratio);
+	currentratio = ratio;
+	if (this->morphshapetag)
+		this->morphshapetag->getTokensForRatio(tokens,ratio);
 	this->hasChanged = true;
-	this->setNeedsTextureRecalculation(ratio != 0 && ratio != 65535);
+	this->setNeedsTextureRecalculation(true);
 	if (isOnStage())
 		requestInvalidation(getSystemState());
+}
+
+uint32_t MorphShape::getTagID() const
+{
+	return morphshapetag ? morphshapetag->getId():UINT32_MAX;
 }
 
 
@@ -3612,7 +3731,7 @@ uint32_t Stage::internalGetWidth() const
 	else
 	{
 		RECT size=getSystemState()->mainClip->getFrameSize();
-		width=size.Xmax/20;
+		width=(size.Xmax-size.Xmin)/20;
 	}
 	return width;
 }
@@ -3625,7 +3744,7 @@ uint32_t Stage::internalGetHeight() const
 	else
 	{
 		RECT size=getSystemState()->mainClip->getFrameSize();
-		height=size.Ymax/20;
+		height=(size.Ymax-size.Ymin)/20;
 	}
 	return height;
 }
@@ -3731,6 +3850,32 @@ void Stage::setFocusTarget(_NR<InteractiveObject> f)
 		focus->gotFocus();
 }
 
+void Stage::addHiddenObject(MovieClip* o)
+{
+	auto it = hiddenobjects.find(o);
+	if (it != hiddenobjects.end())
+		return;
+	hiddenobjects.insert(o);
+}
+
+void Stage::removeHiddenObject(MovieClip* o)
+{
+	auto it = hiddenobjects.find(o);
+	if (it != hiddenobjects.end())
+		hiddenobjects.erase(it);
+}
+
+void Stage::advanceFrame()
+{
+	DisplayObjectContainer::advanceFrame();
+	auto it = hiddenobjects.begin();
+	while (it != hiddenobjects.end())
+	{
+		(*it)->advanceFrame();
+		it++;
+	}
+}
+
 void Stage::initFrame()
 {
 	DisplayObjectContainer::initFrame();
@@ -3751,8 +3896,6 @@ void Stage::executeFrameScript()
 		(*it)->executeFrameScript();
 		it++;
 	}
-	// only execute first frame of hidden objects (?)
-	hiddenobjects.clear();
 }
 
 void Stage::finalize()
@@ -3764,6 +3907,9 @@ void Stage::finalize()
 	avm1MouseListeners.clear();
 	avm1EventListeners.clear();
 	avm1ResizeListeners.clear();
+	fullScreenSourceRect.reset();
+	stage3Ds.reset();
+	softKeyboardRect.reset();
 	DisplayObjectContainer::finalize();
 }
 
@@ -4015,9 +4161,8 @@ ASFUNCTIONBODY_ATOM(Stage,_getWmodeGPU)
 }
 ASFUNCTIONBODY_ATOM(Stage,_invalidate)
 {
-	LOG(LOG_NOT_IMPLEMENTED,"invalidate not implemented yet");
-	// TODO this crashes lightspark
 	Stage* th=asAtomHandler::as<Stage>(obj);
+	RELEASE_WRITE(th->invalidated,true);
 	th->incRef();
 	_R<FlushInvalidationQueueEvent> event=_MR(new (sys->unaccountedMemory) FlushInvalidationQueueEvent());
 	getVm(sys)->addEvent(_MR(th),event);
@@ -4207,6 +4352,11 @@ void Bitmap::onPixelSnappingChanged(tiny_string snapping)
 	pixelSnapping = snapping;
 }
 
+bool Bitmap::renderImpl(RenderContext& ctxt) const
+{
+	return defaultRender(ctxt);
+}
+
 ASFUNCTIONBODY_GETTER_SETTER_CB(Bitmap,bitmapData,onBitmapData);
 ASFUNCTIONBODY_GETTER_SETTER_CB(Bitmap,smoothing,onSmoothingChanged);
 ASFUNCTIONBODY_GETTER_SETTER_CB(Bitmap,pixelSnapping,onPixelSnappingChanged);
@@ -4214,12 +4364,21 @@ ASFUNCTIONBODY_GETTER_SETTER_CB(Bitmap,pixelSnapping,onPixelSnappingChanged);
 void Bitmap::updatedData()
 {
 	if(bitmapData.isNull() || bitmapData->getBitmapContainer().isNull())
+	{
+		if (cachedSurface.isChunkOwner && cachedSurface.tex)
+			cachedSurface.tex->makeEmpty();
+		else
+			cachedSurface.tex=nullptr;
 		return;
+	}
 	cachedSurface.tex = &bitmapData->getBitmapContainer()->bitmaptexture;
 	cachedSurface.isChunkOwner=false;
 	hasChanged=true;
 	if(onStage)
+	{
+		cachedSurface.isValid=true;
 		requestInvalidation(getSystemState());
+	}
 }
 bool Bitmap::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const
 {
@@ -4263,17 +4422,28 @@ void Bitmap::requestInvalidation(InvalidateQueue *q, bool forceTextureRefresh)
 {
 	if(skipRender())
 		return;
+	if (requestInvalidationForCacheAsBitmap(q))
+		return;
 	incRef();
 	// texture recalculation is never needed for bitmaps
 	resetNeedsTextureRecalculation();
 	q->addToInvalidateQueue(_MR(this));
 }
 
-IDrawable *Bitmap::invalidate(DisplayObject *target, const MATRIX &initialMatrix, bool smoothing)
+IDrawable *Bitmap::invalidate(DisplayObject *target, const MATRIX &initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap)
 {
-	int32_t x,y,rx,ry;
-	uint32_t width,height;
-	uint32_t rwidth,rheight;
+	if (cachedBitmap && computeCacheAsBitmap() && (!q || !q->getCacheAsBitmapObject() || q->getCacheAsBitmapObject().getPtr()!=this))
+	{
+		return getCachedBitmapDrawable(target, initialMatrix, cachedBitmap);
+	}
+	return invalidateFromSource(target, initialMatrix, this->smoothing, this, MATRIX(),nullptr);
+}
+
+IDrawable *Bitmap::invalidateFromSource(DisplayObject *target, const MATRIX &initialMatrix, bool smoothing, DisplayObject* matrixsource, const MATRIX& sourceMatrix,DisplayObject* originalsource)
+{
+	number_t x,y,rx,ry;
+	number_t width,height;
+	number_t rwidth,rheight;
 	number_t bxmin,bxmax,bymin,bymax;
 	if(!boundsRectWithoutChildren(bxmin,bxmax,bymin,bymax))
 	{
@@ -4290,19 +4460,23 @@ IDrawable *Bitmap::invalidate(DisplayObject *target, const MATRIX &initialMatrix
 	getSystemState()->stageCoordinateMapping(getSystemState()->getRenderThread()->windowWidth,getSystemState()->getRenderThread()->windowHeight,offx,offy, scalex,scaley);
 
 	bool isMask;
-	bool hasMask;
+	_NR<DisplayObject> mask;
 	if (target)
 	{
-		computeMasksAndMatrix(target,masks,totalMatrix,false,isMask,hasMask);
+		if (matrixsource)
+			matrixsource->computeMasksAndMatrix(target,masks,totalMatrix,false,isMask,mask);
 		totalMatrix=initialMatrix.multiplyMatrix(totalMatrix);
 	}
+	totalMatrix = totalMatrix.multiplyMatrix(sourceMatrix);
 	computeBoundsForTransformedRect(bxmin,bxmax,bymin,bymax,x,y,width,height,totalMatrix);
-
+	MATRIX m;
+	if (matrixsource)
+		m = matrixsource->getConcatenatedMatrix();
 	width = bxmax-bxmin;
 	height = bymax-bymin;
-	float rotation = getConcatenatedMatrix().getRotation();
-	float xscale = getConcatenatedMatrix().getScaleX();
-	float yscale = getConcatenatedMatrix().getScaleY();
+	float rotation = m.getRotation();
+	float xscale = m.getScaleX();
+	float yscale = m.getScaleY();
 	float redMultiplier=1.0;
 	float greenMultiplier=1.0;
 	float blueMultiplier=1.0;
@@ -4315,12 +4489,14 @@ IDrawable *Bitmap::invalidate(DisplayObject *target, const MATRIX &initialMatrix
 	std::vector<IDrawable::MaskData> masks2;
 	if (target)
 	{
-		computeMasksAndMatrix(target,masks2,totalMatrix2,true,isMask,hasMask);
+		if (matrixsource)
+			matrixsource->computeMasksAndMatrix(target,masks2,totalMatrix2,true,isMask,mask);
 		totalMatrix2=initialMatrix.multiplyMatrix(totalMatrix2);
 	}
+	totalMatrix2 = totalMatrix2.multiplyMatrix(sourceMatrix);
 	computeBoundsForTransformedRect(bxmin,bxmax,bymin,bymax,rx,ry,rwidth,rheight,totalMatrix2);
 	ColorTransform* ct = colorTransform.getPtr();
-	DisplayObjectContainer* p = getParent();
+	DisplayObjectContainer* p = matrixsource ? matrixsource->getParent() :nullptr;
 	while (!ct && p)
 	{
 		ct = p->colorTransform.getPtr();
@@ -4339,14 +4515,22 @@ IDrawable *Bitmap::invalidate(DisplayObject *target, const MATRIX &initialMatrix
 		blueOffset=ct->blueOffset;
 		alphaOffset=ct->alphaOffset;
 	}
+	cachedSurface.isValid=true;
+	if (originalsource)
+	{
+		if (!isMask)
+			isMask = originalsource->ClipDepth || !originalsource->maskOf.isNull();
+		if (!mask)
+			mask = originalsource->mask;
+	}
 	return new BitmapRenderer(this->bitmapData->getBitmapContainer()
-				, x*scalex, y*scaley, width*scalex, height*scaley
-				, rx*scalex,ry*scaley,rwidth*scalex,rheight*scaley,rotation
+				, x*scalex, y*scaley, ceil(width*scalex), ceil(height*scaley)
+				, rx*scalex, ry*scaley, ceil(rwidth*scalex), ceil(rheight*scaley), rotation
 				, xscale, yscale
-				, isMask, hasMask
-				, getConcatenatedAlpha(), masks
+				, isMask, mask
+				, originalsource ? originalsource->getConcatenatedAlpha() : getConcatenatedAlpha(), masks
 				, redMultiplier,greenMultiplier,blueMultiplier,alphaMultiplier
-				, redOffset,greenOffset,blueOffset,alphaOffset);
+				, redOffset,greenOffset,blueOffset,alphaOffset,smoothing,totalMatrix2);
 }
 
 void SimpleButton::sinit(Class_base* c)
@@ -4462,6 +4646,20 @@ bool SimpleButton::AVM1HandleMouseEvent(EventDispatcher* dispatcher, MouseEvent 
 	}
 	handled |= AVM1HandleMouseEventStandard(dispobj,e);
 	return handled;
+}
+
+void SimpleButton::handleMouseCursor(bool rollover)
+{
+	if (rollover)
+	{
+		hasMouse=true;
+		getSystemState()->setMouseHandCursor(this->useHandCursor);
+	}
+	else
+	{
+		getSystemState()->setMouseHandCursor(false);
+		hasMouse=false;
+	}
 }
 
 bool SimpleButton::AVM1HandleKeyboardEvent(KeyboardEvent *e)
@@ -4639,7 +4837,7 @@ _NR<DisplayObject> SimpleButton::hitTestImpl(_NR<DisplayObject> last, number_t x
 	/* mouseDown events, for example, are never dispatched to the hitTestState,
 	 * but directly to this button (and with event.target = this). This has been
 	 * tested with the official flash player. It cannot work otherwise, as
-	 * hitTestState->parent == NULL. (This has also been verified)
+	 * hitTestState->parent == nullptr. (This has also been verified)
 	 */
 	if(ret)
 	{
@@ -4678,10 +4876,71 @@ void SimpleButton::defaultEventBehavior(_R<Event> e)
 		DisplayObjectContainer::defaultEventBehavior(e);
 }
 
+bool SimpleButton::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const
+{
+	bool ret = false;
+	number_t txmin,txmax,tymin,tymax;
+	if (!upState.isNull() && upState->getBounds(txmin,txmax,tymin,tymax,upState->getMatrix()))
+	{
+		if(ret==true)
+		{
+			xmin = min(xmin,txmin);
+			xmax = max(xmax,txmax);
+			ymin = min(ymin,tymin);
+			ymax = max(ymax,tymax);
+		}
+		else
+		{
+			xmin=txmin;
+			xmax=txmax;
+			ymin=tymin;
+			ymax=tymax;
+			ret=true;
+		}
+	}
+	if (!overState.isNull() && overState->getBounds(txmin,txmax,tymin,tymax,overState->getMatrix()))
+	{
+		if(ret==true)
+		{
+			xmin = min(xmin,txmin);
+			xmax = max(xmax,txmax);
+			ymin = min(ymin,tymin);
+			ymax = max(ymax,tymax);
+		}
+		else
+		{
+			xmin=txmin;
+			xmax=txmax;
+			ymin=tymin;
+			ymax=tymax;
+			ret=true;
+		}
+	}
+	if (!downState.isNull() && upState->getBounds(txmin,txmax,tymin,tymax,downState->getMatrix()))
+	{
+		if(ret==true)
+		{
+			xmin = min(xmin,txmin);
+			xmax = max(xmax,txmax);
+			ymin = min(ymin,tymin);
+			ymax = max(ymax,tymax);
+		}
+		else
+		{
+			xmin=txmin;
+			xmax=txmax;
+			ymin=tymin;
+			ymax=tymax;
+			ret=true;
+		}
+	}
+	return ret;
+}
+
 SimpleButton::SimpleButton(Class_base* c, DisplayObject *dS, DisplayObject *hTS,
 				DisplayObject *oS, DisplayObject *uS, DefineButtonTag *tag)
 	: DisplayObjectContainer(c), downState(dS), hitTestState(hTS), overState(oS), upState(uS),
-	  buttontag(tag),currentState(STATE_OUT),enabled(true),useHandCursor(true)
+	  buttontag(tag),currentState(STATE_OUT),enabled(true),useHandCursor(true),hasMouse(false)
 {
 	/* When called from DefineButton2Tag::instance, they are not constructed yet
 	 * TODO: construct them here for once, or each time they become visible?
@@ -4723,23 +4982,36 @@ void SimpleButton::finalize()
 	hitTestState.reset();
 	overState.reset();
 	upState.reset();
+	enabled=true;
+	useHandCursor=true;
+	hasMouse=false;
 	buttontag=nullptr;
 }
-
-IDrawable *SimpleButton::invalidate(DisplayObject *target, const MATRIX &initialMatrix, bool smoothing)
+IDrawable *SimpleButton::invalidate(DisplayObject *target, const MATRIX &initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap)
 {
+	if (computeCacheAsBitmap() && (!q || !q->getCacheAsBitmapObject() || q->getCacheAsBitmapObject().getPtr()!=this))
+	{
+		return getCachedBitmapDrawable(target, initialMatrix, cachedBitmap);
+	}
 	if (!upState.isNull())
-		upState->invalidate(target,initialMatrix,smoothing);
+		upState->invalidate(target,initialMatrix,smoothing,q,cachedBitmap);
 	if (!overState.isNull())
-		overState->invalidate(target,initialMatrix,smoothing);
+		overState->invalidate(target,initialMatrix,smoothing,q,cachedBitmap);
 	if (!downState.isNull())
-		downState->invalidate(target,initialMatrix,smoothing);
+		downState->invalidate(target,initialMatrix,smoothing,q,cachedBitmap);
 	if (!hitTestState.isNull())
-		hitTestState->invalidate(target,initialMatrix,smoothing);
-	return DisplayObjectContainer::invalidate(target, initialMatrix,smoothing);
+		hitTestState->invalidate(target,initialMatrix,smoothing,q,cachedBitmap);
+	return nullptr;
 }
 void SimpleButton::requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh)
 {
+	if (requestInvalidationForCacheAsBitmap(q))
+		return;
+	if (computeCacheAsBitmap())
+	{
+		incRef();
+		q->addToInvalidateQueue(_MR(this));
+	}
 	if (!upState.isNull())
 	{
 		upState->hasChanged = true;
@@ -4768,7 +5040,6 @@ void SimpleButton::requestInvalidation(InvalidateQueue* q, bool forceTextureRefr
 			hitTestState->colorTransform = this->colorTransform;
 		hitTestState->requestInvalidation(q,forceTextureRefresh);
 	}
-	
 	DisplayObjectContainer::requestInvalidation(q,forceTextureRefresh);
 }
 
@@ -4804,7 +5075,7 @@ void SimpleButton::reflectState()
 {
 	assert(dynamicDisplayList.empty() || dynamicDisplayList.size() == 1);
 	if(!dynamicDisplayList.empty())
-		_removeChild(dynamicDisplayList.front().getPtr());
+		_removeChild(dynamicDisplayList.front().getPtr(),true);
 
 	if((currentState == UP || currentState == STATE_OUT) && !upState.isNull())
 	{
@@ -4928,6 +5199,7 @@ ASFUNCTIONBODY_ATOM(SimpleButton,_setUseHandCursor)
 	SimpleButton* th=asAtomHandler::as<SimpleButton>(obj);
 	assert_and_throw(argslen==1);
 	th->useHandCursor=asAtomHandler::Boolean_concrete(args[0]);
+	th->handleMouseCursor(th->hasMouse);
 }
 
 ASFUNCTIONBODY_ATOM(SimpleButton,_getUseHandCursor)
@@ -4960,6 +5232,7 @@ void BlendMode::sinit(Class_base* c)
 	c->setVariableAtomByQName("OVERLAY",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"overlay"),CONSTANT_TRAIT);
 	c->setVariableAtomByQName("SCREEN",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"screen"),CONSTANT_TRAIT);
 	c->setVariableAtomByQName("SUBTRACT",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"subtract"),CONSTANT_TRAIT);
+	c->setVariableAtomByQName("SHADER",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"shader"),CONSTANT_TRAIT);
 }
 
 void SpreadMethod::sinit(Class_base* c)
@@ -5075,7 +5348,7 @@ void DisplayObjectContainer::executeFrameScript()
 		(*it)->executeFrameScript();
 }
 
-multiname *DisplayObjectContainer::setVariableByMultiname(const multiname &name, asAtom &o, ASObject::CONST_ALLOWED_FLAG allowConst, bool *alreadyset)
+multiname *DisplayObjectContainer::setVariableByMultiname(multiname& name, asAtom &o, ASObject::CONST_ALLOWED_FLAG allowConst, bool *alreadyset)
 {
 // TODO I disable this for now as gamesmenu from homestarrunner doesn't work with it (I don't know which swf file required this...)
 //	if (asAtomHandler::is<DisplayObject>(o))
@@ -5212,7 +5485,6 @@ void MovieClip::initFrame()
 	{
 		frameScriptToExecute=state.FP;
 	}
-	state.frameadvanced=false;
 	state.creatingframe=false;
 }
 
@@ -5288,6 +5560,13 @@ void MovieClip::advanceFrame()
 		stopSound();
 	else
 		checkSound(state.next_FP);
+	if (state.frameadvanced && state.explicit_FP)
+	{
+		// frame was advanced more than once in one EnterFrame event, so initFrame was not called
+		// set last_FP to the FP set by previous advanceFrame
+		state.last_FP=state.FP;
+	}
+	state.frameadvanced=false;
 	state.creatingframe=true;
 	if (frameScriptToExecute != UINT32_MAX)
 	{
@@ -5359,19 +5638,19 @@ void MovieClip::constructionComplete()
 	{
 		advanceFrame();
 		initFrame();
+		if (!needsActionScript3())
+			executeFrameScript();
 	}
 }
 
 void MovieClip::afterConstruction()
 {
-	// execute framescript of frame 0 after construction is completed
+	// set framescript of frame 0 after construction is completed
 	// only if state.FP was not changed during construction
 	if(frameScripts.count(0) && state.FP == 0)
 	{
 		if (frameScripts.count(0))
 			frameScriptToExecute = 0;
-		this->incRef();
-		this->getSystemState()->currentVm->prependEvent(NullRef, _MR(new (this->getSystemState()->unaccountedMemory) ExecuteFrameScriptEvent(_MR(this))));
 	}
 	if (!this->loadedFrom->usesActionScript3 && !this->inAVM1Attachment)
 	{

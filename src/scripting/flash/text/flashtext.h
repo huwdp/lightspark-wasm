@@ -26,6 +26,9 @@
 #include "scripting/flash/display/flashdisplay.h"
 #include "3rdparty/pugixml/src/pugixml.hpp"
 
+// according to TextLineMetrics specs, there are always 2 pixels added to each side of a textfield
+#define TEXTFIELD_PADDING 2
+
 namespace lightspark
 {
 class Array;
@@ -95,7 +98,7 @@ private:
 	_NR<DisplayObject> hitTestImpl(_NR<DisplayObject> last, number_t x, number_t y, HIT_TYPE type,bool interactiveObjectsOnly) override;
 	bool renderImpl(RenderContext& ctxt) const override;
 	bool boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const override;
-	IDrawable* invalidate(DisplayObject* target, const MATRIX& initialMatrix, bool smoothing) override;
+	IDrawable* invalidate(DisplayObject* target, const MATRIX& initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap) override;
 	void requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh=false) override;
 	void defaultEventBehavior(_R<Event> e) override;
 	void updateText(const tiny_string& new_text);
@@ -110,7 +113,7 @@ private:
 	int32_t getMaxScrollH();
 	int32_t getMaxScrollV();
 	void textUpdated();
-	void setSizeAndPositionFromAutoSize();
+	void setSizeAndPositionFromAutoSize(bool updatewidth=true);
 	void replaceText(unsigned int begin, unsigned int end, const tiny_string& newText);
 	EDIT_TYPE type;
 	ANTI_ALIAS_TYPE antiAliasType;
@@ -121,10 +124,21 @@ private:
 	tiny_string tagvarname;
 	Mutex invalidatemutex;
 	DefineEditTextTag* tag;
+	int32_t originalXPosition;
+	int32_t originalWidth;
+
+	// these are only used when drawing to DisplayObject, so they are guarranteed not to be destroyed during rendering
+	list<FILLSTYLE> fillstyleTextColor;
+	FILLSTYLE fillstyleBackgroundColor;
+	LINESTYLE2 lineStyleBorder;
+	LINESTYLE2 lineStyleCaret;
+	Mutex* linemutex;
+	void getTextBounds(const tiny_string &txt, number_t &xmin, number_t &xmax, number_t &ymin, number_t &ymax);
 protected:
 	void afterSetLegacyMatrix() override;
 public:
 	TextField(Class_base* c, const TextData& textData=TextData(), bool _selectable=true, bool readOnly=true, const char* varname="", DefineEditTextTag* _tag=nullptr);
+	~TextField();
 	void finalize() override;
 	static void sinit(Class_base* c);
 	static void buildTraits(ASObject* o);
@@ -137,7 +151,7 @@ public:
 	void gotFocus() override;
 	void textInputChanged(const tiny_string& newtext) override;
 	void tick() override;
-	void tickFence() override {}
+	void tickFence() override;
 	uint32_t getTagID() const override;
 	
 	ASFUNCTION_ATOM(appendText);
@@ -180,6 +194,9 @@ public:
 	ASFUNCTION_ATOM(_setSelection);
 	ASFUNCTION_ATOM(_replaceText);
 	ASFUNCTION_ATOM(_replaceSelectedText);
+	ASFUNCTION_ATOM(_getCharBoundaries);
+	ASFUNCTION_ATOM(_getdisplayAsPassword);
+	ASFUNCTION_ATOM(_setdisplayAsPassword);
 	ASPROPERTY_GETTER_SETTER(bool, alwaysShowSelection);
 	ASFUNCTION_GETTER_SETTER(background);
 	ASFUNCTION_GETTER_SETTER(backgroundColor);
@@ -187,7 +204,6 @@ public:
 	ASFUNCTION_GETTER_SETTER(borderColor);
 	ASPROPERTY_GETTER(uint32_t, caretIndex);
 	ASPROPERTY_GETTER_SETTER(bool, condenseWhite);
-	ASPROPERTY_GETTER_SETTER(bool, displayAsPassword);
 	ASPROPERTY_GETTER_SETTER(bool, embedFonts);
 	ASPROPERTY_GETTER_SETTER(int32_t, maxChars);
 	ASFUNCTION_GETTER_SETTER(multiline);
@@ -203,7 +219,8 @@ public:
 	ASPROPERTY_GETTER_SETTER(number_t, thickness);
 	ASFUNCTION_GETTER_SETTER(type);
 	ASPROPERTY_GETTER_SETTER(bool, useRichTextClipboard);
-	
+	ASFUNCTION_ATOM(_setTextFieldX);
+
 	std::string toDebugString() override;
 };
 
@@ -267,17 +284,15 @@ private:
 	uint32_t tagID;
 protected:
 	bool boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const override;
-	bool renderImpl(RenderContext& ctxt) const override
-		{ return TokenContainer::renderImpl(ctxt); }
+	bool renderImpl(RenderContext& ctxt) const override;
 	_NR<DisplayObject> hitTestImpl(_NR<DisplayObject> last, number_t x, number_t y, HIT_TYPE type,bool interactiveObjectsOnly) override;
 public:
-	StaticText(Class_base* c) : DisplayObject(c),TokenContainer(this, this->getSystemState()->textTokenMemory),tagID(UINT32_MAX) {}
+	StaticText(Class_base* c) : DisplayObject(c),TokenContainer(this),tagID(UINT32_MAX) {}
 	StaticText(Class_base* c, const tokensVector& tokens,const RECT& b,uint32_t _tagID):
-		DisplayObject(c),TokenContainer(this, this->getSystemState()->textTokenMemory, tokens, 1.0f/1024.0f/20.0f/20.0f),bounds(b),tagID(_tagID) {}
+		DisplayObject(c),TokenContainer(this, tokens, 1.0f/1024.0f/20.0f/20.0f),bounds(b),tagID(_tagID) {}
 	static void sinit(Class_base* c);
 	void requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh=false) override { TokenContainer::requestInvalidation(q,forceTextureRefresh); }
-	IDrawable* invalidate(DisplayObject* target, const MATRIX& initialMatrix,bool smoothing) override
-	{ return TokenContainer::invalidate(target, initialMatrix,smoothing); }
+	IDrawable* invalidate(DisplayObject* target, const MATRIX& initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap) override;
 	uint32_t getTagID() const override { return tagID; }
 };
 

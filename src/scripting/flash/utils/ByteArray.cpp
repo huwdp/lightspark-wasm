@@ -459,6 +459,7 @@ bool ByteArray::readUTFBytes(uint32_t length,tiny_string& ret)
 	strncpy(buf,(char*)bufStart,(size_t)length);
 	position+=length;
 	ret = buf;
+	ret.checkValidUTF();
 	return true;
 }
 bool ByteArray::readBytes(uint32_t offset, uint32_t length,uint8_t* ret)
@@ -1175,7 +1176,7 @@ int32_t ByteArray::getVariableByMultiname_i(const multiname& name)
 		return _MNR(getSystemState()->getUndefinedRef());
 }
 
-multiname *ByteArray::setVariableByMultiname(const multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, bool* alreadyset)
+multiname *ByteArray::setVariableByMultiname(multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, bool* alreadyset)
 {
 	assert_and_throw(implEnable);
 	unsigned int index=0;
@@ -1223,7 +1224,7 @@ void ByteArray::setVariableByInteger(int index, asAtom &o, ASObject::CONST_ALLOW
 
 	ASATOM_DECREF(o);
 }
-void ByteArray::setVariableByMultiname_i(const multiname& name, int32_t value)
+void ByteArray::setVariableByMultiname_i(multiname& name, int32_t value)
 {
 	asAtom v = asAtomHandler::fromInt(value);
 	setVariableByMultiname(name, v,ASObject::CONST_NOT_ALLOWED);
@@ -1392,7 +1393,7 @@ void ByteArray::compress_zlib()
 	position=buflen;
 }
 
-void ByteArray::uncompress_zlib()
+void ByteArray::uncompress_zlib(bool raw)
 {
 	z_stream strm;
 	int status;
@@ -1406,7 +1407,7 @@ void ByteArray::uncompress_zlib()
 	strm.avail_in=len;
 	strm.next_in=bytes;
 	strm.total_out=0;
-	status=inflateInit(&strm);
+	status=inflateInit2(&strm,raw ? -15 : 15);
 	if(status==Z_VERSION_ERROR)
 		throw Class<IOError>::getInstanceS(getSystemState(),"not valid compressed data");
 	else if(status!=Z_OK)
@@ -1461,7 +1462,7 @@ ASFUNCTIONBODY_ATOM(ByteArray,_uncompress)
 	// and always uses the zlib algorithm
 	// but tamarin tests do not catch it, so we simply ignore any parameters provided
 	th->lock();
-	th->uncompress_zlib();
+	th->uncompress_zlib(false);
 	th->unlock();
 }
 
@@ -1477,7 +1478,7 @@ ASFUNCTIONBODY_ATOM(ByteArray,_inflate)
 {
 	ByteArray* th=asAtomHandler::as<ByteArray>(obj);
 	th->lock();
-	th->uncompress_zlib();
+	th->uncompress_zlib(true);
 	th->unlock();
 }
 

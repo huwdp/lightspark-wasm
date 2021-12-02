@@ -817,10 +817,9 @@ ppPluginInstance::ppPluginInstance(PP_Instance instance, int16_t argc, const cha
 	inWriting(false)
 {
 	m_messageloop = g_messageloop_interface->Create(this->getppInstance());
-	m_ppLoopThread = SDL_CreateThread(ppPluginInstance::worker,"pploop",this);
 	m_cachefilesystem = g_filesystem_interface->Create(getppInstance(),PP_FileSystemType::PP_FILESYSTEMTYPE_LOCALTEMPORARY);
 	g_messageloop_interface->PostWork(m_messageloop,PP_MakeCompletionCallback(openfilesystem_callback,this),0);
-	
+
 	m_cachefilename = 0;
 	m_last_size.width = 0;
 	m_last_size.height = 0;
@@ -829,6 +828,8 @@ ppPluginInstance::ppPluginInstance(PP_Instance instance, int16_t argc, const cha
 	m_sys=new lightspark::SystemState(0, lightspark::SystemState::FLASH);
 	//Files running in the plugin have REMOTE sandbox
 	m_sys->securityManager->setSandboxType(lightspark::SecurityManager::REMOTE);
+
+	m_ppLoopThread = SDL_CreateThread(ppPluginInstance::worker,"pploop",this);
 
 	m_sys->extScriptObject = new ppExtScriptObject(this,m_sys);
 	//Parse OBJECT/EMBED tag attributes
@@ -880,7 +881,6 @@ int ppPluginInstance::worker(void* d)
 	
 	while (g_messageloop_interface->GetCurrent() != 0 && (!th->m_sys || !th->m_sys->isShuttingDown()))
 	{
-		LOG(LOG_ERROR,"pluginworker");
 		g_messageloop_interface->Run(th->m_messageloop);
 	}
 	return 0;
@@ -921,8 +921,8 @@ ppPluginInstance::~ppPluginInstance()
 	m_sys->setShutdownFlag();
 
 	m_sys->destroy();
-	delete m_sys;
 	delete m_pt;
+	delete m_sys;
 	g_messageloop_interface->PostQuit(m_messageloop,PP_TRUE);
 	SDL_WaitThread(m_ppLoopThread,nullptr);
 	setTLSSys(nullptr);
@@ -958,7 +958,6 @@ void ppPluginInstance::handleResize(PP_Resource view)
 			m_sys->setParamsAndEngine(e, false);
 			g_graphics_3d_interface->ResizeBuffers(m_graphics,position.size.width, position.size.height);
 			m_sys->getRenderThread()->SetEngineData(m_sys->getEngineData());
-			m_sys->getRenderThread()->init();
 		}
 		else
 		{
@@ -2567,6 +2566,12 @@ void ppPluginEngineData::audio_StreamPause(int channel, bool dopause)
 
 void ppPluginEngineData::audio_StreamSetVolume(int channel, double volume)
 {
+	LOG(LOG_NOT_IMPLEMENTED, "setting volume on PPAPI plugin");
+}
+
+void ppPluginEngineData::audio_StreamSetPanning(int channel, uint16_t left, uint16_t right)
+{
+	LOG(LOG_NOT_IMPLEMENTED, "setting panning on PPAPI plugin");
 }
 
 void ppPluginEngineData::audio_StreamDeinit(int channel)
@@ -2625,7 +2630,7 @@ int32_t ppPluginEngineData::setupFontRenderer(const TextData &_textData,float a,
 	PP_Size size = PP_MakeSize(_textData.width, _textData.height);
 	
 	PP_BrowserFont_Trusted_TextRun text;
-	text.text = g_var_interface->VarFromUtf8(_textData.text.raw_buf(),_textData.text.numBytes());
+	text.text = g_var_interface->VarFromUtf8(_textData.getText().raw_buf(),_textData.getText().numBytes());
 	text.override_direction = PP_FALSE;
 	text.rtl = PP_FALSE;
 	

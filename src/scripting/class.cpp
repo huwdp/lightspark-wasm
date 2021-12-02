@@ -61,10 +61,11 @@ Activation_object* lightspark::new_activationObject(SystemState* sys)
 }
 
 
-Class_inherit::Class_inherit(const QName& name, MemoryAccount* m, const traits_info *_classtrait, Global *_defobj):Class_base(name, m),tag(nullptr),bindedToRoot(false),classtrait(_classtrait),definitionobject(_defobj)
+Class_inherit::Class_inherit(const QName& name, MemoryAccount* m, const traits_info *_classtrait, Global *_global):Class_base(name, m),tag(nullptr),bindedToRoot(false),classtrait(_classtrait)
 {
+	this->global=_global;
 	this->incRef(); //create on reference for the classes map
-	this->getSystemState()->customClasses.insert(this);
+	this->getSystemState()->customClasses.insert(make_pair(name.nameId,this));
 	isReusable = true;
 	subtype = SUBTYPE_INHERIT;
 }
@@ -85,8 +86,9 @@ void Class_inherit::finalize()
 
 void Class_inherit::getInstance(asAtom& ret,bool construct, asAtom* args, const unsigned int argslen, Class_base* realClass)
 {
+	checkScriptInit();
 	//We override the classdef
-	if(realClass==NULL)
+	if(realClass==nullptr)
 		realClass=this;
 	if (!this->isBinded()) // it seems possible that an instance of a class is constructed before the binding of the class is available, so we have to check for a binding here
 		getSystemState()->mainClip->bindClass(this->class_name,this);
@@ -100,11 +102,11 @@ void Class_inherit::getInstance(asAtom& ret,bool construct, asAtom* args, const 
 	{
 		assert_and_throw(super);
 		//Our super should not construct, we are going to do it ourselves
-		super->getInstance(ret,false,NULL,0,realClass);
+		super->getInstance(ret,false,nullptr,0,realClass);
 		if (instancefactory.isNull())
 		{
 			asAtom instance=asAtomHandler::invalidAtom;
-			super->getInstance(instance,false,NULL,0,realClass);
+			super->getInstance(instance,false,nullptr,0,realClass);
 			instancefactory = _MR(asAtomHandler::getObject(instance));
 		}
 	}
@@ -189,7 +191,18 @@ bool Class_inherit::hasoverriddenmethod(multiname *name) const
 {
 	// TODO we currently only check for names, not for namespaces as there are some issues regarding protected namespaces
 	// so we may get some false positives here...
-	return class_index == -1 ? true : this->context->instances[this->class_index].overriddenmethods && this->context->instances[this->class_index].overriddenmethods->find(name->name_s_id) != this->context->instances[this->class_index].overriddenmethods->end();
+	if (class_index == -1)
+		return true;
+	const instance_info& c = this->context->instances[this->class_index];
+	if (c.overriddenmethods && c.overriddenmethods->find(name->name_s_id) != c.overriddenmethods->end())
+		return true;
+	return Class_base::hasoverriddenmethod(name);
+}
+
+GET_VARIABLE_RESULT Class_inherit::getVariableByMultiname(asAtom& ret, const multiname& name, GET_VARIABLE_OPTION opt)
+{
+	checkScriptInit();
+	return Class_base::getVariableByMultiname(ret,name,opt);
 }
 
 template<>
@@ -200,12 +213,12 @@ void Class<Global>::getInstance(asAtom& ret, bool construct, asAtom* args, const
 
 void lightspark::lookupAndLink(Class_base* c, const tiny_string& name, const tiny_string& interfaceNs)
 {
-	variable* var=NULL;
+	variable* var=nullptr;
 	Class_base* cur=c;
 	//Find the origin
 	while(cur)
 	{
-		var=cur->borrowedVariables.findObjVar(c->getSystemState()->getUniqueStringId(name),nsNameAndKind(c->getSystemState(),"",NAMESPACE),NO_CREATE_TRAIT,DECLARED_TRAIT);
+		var=cur->borrowedVariables.findObjVar(c->getSystemState()->getUniqueStringId(name),nsNameAndKind(),NO_CREATE_TRAIT,DECLARED_TRAIT);
 		if(var)
 			break;
 		cur=cur->super.getPtr();
@@ -228,6 +241,39 @@ void lightspark::lookupAndLink(Class_base* c, const tiny_string& name, const tin
 		assert_and_throw(asAtomHandler::isFunction(var->setter));
 		ASATOM_INCREF(var->setter);
 		c->setDeclaredMethodAtomByQName(name,interfaceNs,var->setter,SETTER_METHOD,true);
+	}
+}
+
+void lightspark::lookupAndLink(Class_base* c, uint32_t nameID, uint32_t interfaceNsID)
+{
+	variable* var=nullptr;
+	Class_base* cur=c;
+	//Find the origin
+	while(cur)
+	{
+		var=cur->borrowedVariables.findObjVar(nameID,nsNameAndKind(),NO_CREATE_TRAIT,DECLARED_TRAIT);
+		if(var)
+			break;
+		cur=cur->super.getPtr();
+	}
+	assert_and_throw(var);
+	if(asAtomHandler::isValid(var->var))
+	{
+		assert_and_throw(asAtomHandler::isFunction(var->var));
+		ASATOM_INCREF(var->var);
+		c->setDeclaredMethodAtomByQName(nameID,nsNameAndKind(c->getSystemState(),interfaceNsID, NAMESPACE),var->var,NORMAL_METHOD,true);
+	}
+	if(asAtomHandler::isValid(var->getter))
+	{
+		assert_and_throw(asAtomHandler::isFunction(var->getter));
+		ASATOM_INCREF(var->getter);
+		c->setDeclaredMethodAtomByQName(nameID,nsNameAndKind(c->getSystemState(),interfaceNsID, NAMESPACE),var->getter,GETTER_METHOD,true);
+	}
+	if(asAtomHandler::isValid(var->setter))
+	{
+		assert_and_throw(asAtomHandler::isFunction(var->setter));
+		ASATOM_INCREF(var->setter);
+		c->setDeclaredMethodAtomByQName(nameID,nsNameAndKind(c->getSystemState(),interfaceNsID, NAMESPACE),var->setter,SETTER_METHOD,true);
 	}
 }
 

@@ -146,7 +146,7 @@ ASFUNCTIONBODY_ATOM(RegExp,exec)
 
 ASObject *RegExp::match(const tiny_string& str)
 {
-	pcre* pcreRE = compile();
+	pcre* pcreRE = compile(!str.isSinglebyte());
 	if (!pcreRE)
 		return getSystemState()->getNullRef();
 	int capturingGroups;
@@ -186,11 +186,18 @@ ASObject *RegExp::match(const tiny_string& str)
 		return getSystemState()->getNullRef();
 	}
 	pcre_extra extra;
-	extra.match_limit_recursion=200;
+	extra.match_limit_recursion=500;
 	extra.flags = PCRE_EXTRA_MATCH_LIMIT_RECURSION;
 	int ovector[(capturingGroups+1)*3];
 	int offset=global?lastIndex:0;
-	int rc=pcre_exec(pcreRE,capturingGroups > 200 ? &extra : NULL, str.raw_buf(), str.numBytes(), offset, 0, ovector, (capturingGroups+1)*3);
+	if(offset<0)
+	{
+		//beyond last match
+		pcre_free(pcreRE);
+		lastIndex=0;
+		return getSystemState()->getNullRef();
+	}
+	int rc=pcre_exec(pcreRE,capturingGroups > 500 ? &extra : nullptr, str.raw_buf(), str.numBytes(), offset, 0, ovector, (capturingGroups+1)*3);
 	if(rc<0)
 	{
 		//No matches or error
@@ -238,7 +245,7 @@ ASFUNCTIONBODY_ATOM(RegExp,test)
 	RegExp* th=asAtomHandler::as<RegExp>(obj);
 
 	const tiny_string& arg0 = asAtomHandler::toString(args[0],sys);
-	pcre* pcreRE = th->compile();
+	pcre* pcreRE = th->compile(!arg0.isSinglebyte());
 	if (!pcreRE)
 	{
 		asAtomHandler::setNull(ret);
@@ -290,9 +297,11 @@ ASFUNCTIONBODY_ATOM(RegExp,_toString)
 	ret = asAtomHandler::fromObject(abstract_s(sys,res));
 }
 
-pcre* RegExp::compile()
+pcre* RegExp::compile(bool isutf8)
 {
-	int options = PCRE_UTF8|PCRE_NEWLINE_ANY|PCRE_JAVASCRIPT_COMPAT;
+	int options = PCRE_NEWLINE_ANY;
+	if(isutf8)
+		options |= PCRE_UTF8;
 	if(ignoreCase)
 		options |= PCRE_CASELESS;
 	if(extended)
@@ -305,16 +314,16 @@ pcre* RegExp::compile()
 	const char * error;
 	int errorOffset;
 	int errorcode;
-	pcre* pcreRE=pcre_compile2(source.raw_buf(), options,&errorcode,  &error, &errorOffset,NULL);
+	pcre* pcreRE=pcre_compile2(source.raw_buf(), options,&errorcode,  &error, &errorOffset,nullptr);
 	if(error)
 	{
-		if (errorcode == 64) // invalid pattern in javascript compatibility mode (we try again in normal mode to match flash behaviour)
-		{
-			options &= ~PCRE_JAVASCRIPT_COMPAT;
-			pcreRE=pcre_compile2(source.raw_buf(), options,&errorcode,  &error, &errorOffset,NULL);
-		}
+//		if (errorcode == 64) // invalid pattern in javascript compatibility mode (we try again in normal mode to match flash behaviour)
+//		{
+//			options &= ~PCRE_JAVASCRIPT_COMPAT;
+//			pcreRE=pcre_compile2(source.raw_buf(), options,&errorcode,  &error, &errorOffset,NULL);
+//		}
 		if (error)
-			return NULL;
+			return nullptr;
 	}
 	return pcreRE;
 }

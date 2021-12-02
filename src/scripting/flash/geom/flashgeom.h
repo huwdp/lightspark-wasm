@@ -118,6 +118,7 @@ friend class BitmapData;
 friend class DisplayObject;
 friend class AVM1Color;
 friend class TokenContainer;
+friend class TextField;
 protected:
 	number_t redMultiplier,greenMultiplier,blueMultiplier,alphaMultiplier;
 	number_t redOffset,greenOffset,blueOffset,alphaOffset;
@@ -130,6 +131,7 @@ public:
 	// returning r,g,b,a values are between 0.0 and 1.0
 	void applyTransformation(const RGBA &color, float& r, float& g, float& b, float &a);
 	uint8_t* applyTransformation(BitmapContainer* bm);
+	void applyTransformation(uint8_t* bm, uint32_t size);
 	void setProperties(const CXFORMWITHALPHA& cx);
 	static void sinit(Class_base* c);
 	static void buildTraits(ASObject* o);

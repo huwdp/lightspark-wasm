@@ -127,7 +127,7 @@ ASFUNCTIONBODY_ATOM(lightspark,getQualifiedClassName)
 			break;
 	}
 
-	ret = asAtomHandler::fromString(sys,c->getQualifiedClassName());
+	ret = asAtomHandler::fromStringID(c->getQualifiedClassNameID());
 }
 
 ASFUNCTIONBODY_ATOM(lightspark,getQualifiedSuperclassName)
@@ -146,14 +146,14 @@ ASFUNCTIONBODY_ATOM(lightspark,getQualifiedSuperclassName)
 	if (!c)
 		asAtomHandler::setNull(ret);
 	else
-		ret = asAtomHandler::fromString(sys,c->getQualifiedClassName());
+		ret = asAtomHandler::fromStringID(c->getQualifiedClassNameID());
 }
 
 ASFUNCTIONBODY_ATOM(lightspark,getDefinitionByName)
 {
 	assert_and_throw(args && argslen==1);
 	const tiny_string& tmp=asAtomHandler::toString(args[0],sys);
-	multiname name(NULL);
+	multiname name(nullptr);
 	name.name_type=multiname::NAME_STRING;
 
 	tiny_string nsName;
@@ -166,7 +166,10 @@ ASFUNCTIONBODY_ATOM(lightspark,getDefinitionByName)
 	LOG(LOG_CALLS,_("Looking for definition of ") << name);
 	ASObject* target;
 	ret = asAtomHandler::invalidAtom;
-	ABCVm::getCurrentApplicationDomain(getVm(sys)->currentCallContext)->getVariableAndTargetByMultinameIncludeTemplatedClasses(ret,name,target);
+	if (nsName.empty() || nsName.startsWith("flash."))
+		sys->systemDomain->getVariableAndTargetByMultinameIncludeTemplatedClasses(ret,name,target);
+	if(asAtomHandler::isInvalid(ret))
+		ABCVm::getCurrentApplicationDomain(getVm(sys)->currentCallContext)->getVariableAndTargetByMultinameIncludeTemplatedClasses(ret,name,target);
 
 	if(asAtomHandler::isInvalid(ret))
 	{

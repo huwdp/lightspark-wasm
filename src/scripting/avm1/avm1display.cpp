@@ -379,6 +379,8 @@ ASFUNCTIONBODY_ATOM(AVM1Color,setRGB)
 	{
 		asAtom t = asAtomHandler::fromObject(th->target->colorTransform.getPtr());
 		ColorTransform::setColor(ret,sys,t,args,1);
+		th->target->hasChanged=true;
+		th->target->requestInvalidation(sys);
 	}
 }
 
@@ -490,6 +492,8 @@ ASFUNCTIONBODY_ATOM(AVM1Color,setTransform)
 		o->getVariableByMultiname(a,m);
 		if (asAtomHandler::isValid(a))
 			th->target->colorTransform->alphaOffset = asAtomHandler::toNumber(a);
+		th->target->hasChanged=true;
+		th->target->requestInvalidation(sys);
 	}
 }
 bool AVM1Color::destruct()
@@ -515,8 +519,6 @@ ASFUNCTIONBODY_ATOM(AVM1Broadcaster,initialize)
 		listener->setVariableAtomByQName("addListener",nsNameAndKind(),asAtomHandler::fromObjectNoPrimitive(Class<IFunction>::getFunction(sys,addListener)),DYNAMIC_TRAIT);
 		listener->setVariableAtomByQName("removeListener",nsNameAndKind(),asAtomHandler::fromObjectNoPrimitive(Class<IFunction>::getFunction(sys,removeListener)),DYNAMIC_TRAIT);
 		listener->setVariableAtomByQName("_listeners",nsNameAndKind(),asAtomHandler::fromObjectNoPrimitive(listeners),DYNAMIC_TRAIT);
-		LOG(LOG_ERROR,"AVM1Broadcaster.initialize:"<<listener->toDebugString());
-		listener->dumpVariables();
 	}
 }
 ASFUNCTIONBODY_ATOM(AVM1Broadcaster,broadcastMessage)
@@ -524,7 +526,6 @@ ASFUNCTIONBODY_ATOM(AVM1Broadcaster,broadcastMessage)
 	ASObject* th = asAtomHandler::getObject(obj);
 	tiny_string msg;
 	ARG_UNPACK_ATOM(msg);
-	LOG(LOG_ERROR,"AVM1Broadcaster.broadcastMessage:"<<msg);
 	asAtom l = asAtomHandler::invalidAtom;
 	multiname m(nullptr);
 	m.name_type=multiname::NAME_STRING;
@@ -577,8 +578,6 @@ ASFUNCTIONBODY_ATOM(AVM1Broadcaster,addListener)
 	m.name_type=multiname::NAME_STRING;
 	m.name_s_id=sys->getUniqueStringId("_listeners");
 	th->getVariableByMultiname(l,m);
-	LOG(LOG_ERROR,"AVM1Broadcaster.addListener"<<th->toDebugString());
-	th->dumpVariables();
 	if (asAtomHandler::isArray(l))
 	{
 		// TODO spec is not clear if listener can be added multiple times
@@ -600,8 +599,6 @@ ASFUNCTIONBODY_ATOM(AVM1Broadcaster,removeListener)
 	m.name_type=multiname::NAME_STRING;
 	m.name_s_id=sys->getUniqueStringId("_listeners");
 	th->getVariableByMultiname(l,m);
-	LOG(LOG_ERROR,"AVM1Broadcaster.removeListener "<<th->toDebugString());
-	th->dumpVariables();
 	if (asAtomHandler::isArray(l))
 	{
 		Array* listeners = asAtomHandler::as<Array>(l);
@@ -619,6 +616,23 @@ ASFUNCTIONBODY_ATOM(AVM1Broadcaster,removeListener)
 			}
 		}
 	}
+}
+
+void AVM1BitmapData::sinit(Class_base *c)
+{
+	BitmapData::sinit(c);
+	c->setDeclaredMethodByQName("loadBitmap","",Class<IFunction>::getFunction(c->getSystemState(),loadBitmap),NORMAL_METHOD,false);
+	c->setDeclaredMethodByQName("rectangle","",Class<IFunction>::getFunction(c->getSystemState(),getRect,0,Class<Rectangle>::getRef(c->getSystemState()).getPtr()),GETTER_METHOD,true);
+}
+ASFUNCTIONBODY_ATOM(AVM1BitmapData,loadBitmap)
+{
+	tiny_string name;
+	ARG_UNPACK_ATOM(name);
+	BitmapTag* tag = dynamic_cast<BitmapTag*>( sys->mainClip->dictionaryLookupByName(sys->getUniqueStringId(name)));
+	if (tag)
+		ret = asAtomHandler::fromObjectNoPrimitive(tag->instance());
+	else
+		LOG(LOG_ERROR,"BitmapData.loadBitmap tag not found:"<<name);
 }
 
 void AVM1Bitmap::sinit(Class_base *c)

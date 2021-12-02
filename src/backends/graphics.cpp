@@ -36,15 +36,15 @@ using namespace lightspark;
 
 TextureChunk::TextureChunk(uint32_t w, uint32_t h)
 {
-	width=w+(w/CHUNKSIZE_REAL)*2;
-	height=h+(h/CHUNKSIZE_REAL)*2;
+	width=w;
+	height=h;
 	if(w==0 || h==0)
 	{
 		chunks=nullptr;
 		return;
 	}
-	const uint32_t blocksW=(width+CHUNKSIZE-1)/CHUNKSIZE;
-	const uint32_t blocksH=(height+CHUNKSIZE-1)/CHUNKSIZE;
+	const uint32_t blocksW=(width+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL;
+	const uint32_t blocksH=(height+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL;
 	chunks=new uint32_t[blocksW*blocksH];
 }
 
@@ -64,8 +64,8 @@ TextureChunk& TextureChunk::operator=(const TextureChunk& r)
 	}
 	width=r.width;
 	height=r.height;
-	uint32_t blocksW=(width+CHUNKSIZE-1)/CHUNKSIZE;
-	uint32_t blocksH=(height+CHUNKSIZE-1)/CHUNKSIZE;
+	uint32_t blocksW=(width+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL;
+	uint32_t blocksH=(height+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL;
 	texId=r.texId;
 	if(r.chunks)
 	{
@@ -106,11 +106,9 @@ bool TextureChunk::resizeIfLargeEnough(uint32_t w, uint32_t h)
 		height=h;
 		return true;
 	}
-	const uint32_t blocksW=(width+CHUNKSIZE-1)/CHUNKSIZE;
-	const uint32_t blocksH=(height+CHUNKSIZE-1)/CHUNKSIZE;
-	w += (w/CHUNKSIZE_REAL+1)*2;
-	h += (h/CHUNKSIZE_REAL+1)*2;
-	if(w<=blocksW*CHUNKSIZE && h<=blocksH*CHUNKSIZE)
+	const uint32_t blocksW=(width+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL;
+	const uint32_t blocksH=(height+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL;
+	if(w<=blocksW*CHUNKSIZE_REAL && h<=blocksH*CHUNKSIZE_REAL)
 	{
 		width=w;
 		height=h;
@@ -119,15 +117,15 @@ bool TextureChunk::resizeIfLargeEnough(uint32_t w, uint32_t h)
 	return false;
 }
 
-CairoRenderer::CairoRenderer(const MATRIX& _m, int32_t _x, int32_t _y, int32_t _w, int32_t _h, int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r, float _xs, float _ys, bool _im, bool _hm,
+CairoRenderer::CairoRenderer(const MATRIX& _m, int32_t _x, int32_t _y, int32_t _w, int32_t _h, int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r, float _xs, float _ys, bool _im, _NR<DisplayObject> _mask,
 		float _s, float _a, const std::vector<MaskData>& _ms,
 		float _redMultiplier,float _greenMultiplier,float _blueMultiplier,float _alphaMultiplier,
 		float _redOffset,float _greenOffset,float _blueOffset,float _alphaOffset,
-		bool _smoothing, number_t _xstart, number_t _ystart)
-	: IDrawable(_w, _h, _x, _y, _rw, _rh, _rx, _ry, _r, _xs, _ys, _im, _hm,_a, _ms,
+		bool _smoothing)
+	: IDrawable(_w, _h, _x, _y, _rw, _rh, _rx, _ry, _r, _xs, _ys, _im, _mask,_a, _ms,
 				_redMultiplier,_greenMultiplier,_blueMultiplier,_alphaMultiplier,
-				_redOffset,_greenOffset,_blueOffset,_alphaOffset)
-	, scaleFactor(_s),smoothing(_smoothing), matrix(_m),xstart(_xstart),ystart(_ystart)
+				_redOffset,_greenOffset,_blueOffset,_alphaOffset,_smoothing,_m)
+	, scaleFactor(_s)
 {
 }
 
@@ -145,7 +143,7 @@ void CairoTokenRenderer::quadraticBezier(cairo_t* cr, double control_x, double c
 	               end_x, end_y);
 }
 
-cairo_pattern_t* CairoTokenRenderer::FILLSTYLEToCairo(const FILLSTYLE& style, double scaleCorrection, float scalex, float scaley, bool isMask)
+cairo_pattern_t* CairoTokenRenderer::FILLSTYLEToCairo(const FILLSTYLE& style, double scaleCorrection, bool isMask)
 {
 	cairo_pattern_t* pattern = nullptr;
 
@@ -159,25 +157,23 @@ cairo_pattern_t* CairoTokenRenderer::FILLSTYLEToCairo(const FILLSTYLE& style, do
 		}
 		case LINEAR_GRADIENT:
 		case RADIAL_GRADIENT:
+		case FOCAL_RADIAL_GRADIENT:
 		{
-			const GRADIENT& grad = style.Gradient;
+			const std::vector<GRADRECORD>& gradrecords = style.FillStyleType==FOCAL_RADIAL_GRADIENT ? style.FocalGradient.GradientRecords : style.Gradient.GradientRecords;
 
 			// We want an opaque black background... a gradient with no stops
 			// in cairo will give us transparency.
-			if (grad.GradientRecords.size() == 0)
+			if (gradrecords.size() == 0)
 			{
 				pattern = cairo_pattern_create_rgb(0, 0, 0);
 				return pattern;
 			}
 
 			MATRIX tmp=style.Matrix;
-			tmp.x0 -= style.ShapeBounds.Xmin/20;
-			tmp.y0 -= style.ShapeBounds.Ymin/20;
-			cairo_matrix_scale(&tmp,scalex,scaley);
+			tmp.x0 -= number_t(style.ShapeBounds.Xmin)/20.0;
+			tmp.y0 -= number_t(style.ShapeBounds.Ymin)/20.0;
 			tmp.x0/=scaleCorrection;
 			tmp.y0/=scaleCorrection;
-			tmp.x0*=scalex;
-			tmp.y0*=scaley;
 			// The dimensions of the pattern space are specified in SWF specs
 			// as a 32768x32768 box centered at (0,0)
 			if (style.FillStyleType == LINEAR_GRADIENT)
@@ -191,23 +187,24 @@ cairo_pattern_t* CairoTokenRenderer::FILLSTYLEToCairo(const FILLSTYLE& style, do
 			{
 				double x0,y0; //Center of the circles
 				double x1,y1; //Point on the circle edge at 0°
-				tmp.multiply2D(0, 0,x0,y0);
+				tmp.multiply2D(style.FillStyleType == FOCAL_RADIAL_GRADIENT ? style.FocalGradient.FocalPoint*16384.0 : 0, 0,x0,y0);
 				tmp.multiply2D(16384.0, 0,x1,y1);
 				double radius=x1-x0;
 				pattern = cairo_pattern_create_radial(x0, y0, 0, x0, y0, radius);
 			}
 
-			if (grad.SpreadMode == 0) // PAD
+			int spreadmode = style.FillStyleType == FOCAL_RADIAL_GRADIENT ? style.FocalGradient.SpreadMode : style.Gradient.SpreadMode;
+			if (spreadmode == 0) // PAD
 				cairo_pattern_set_extend(pattern, CAIRO_EXTEND_PAD);
-			else if (grad.SpreadMode == 1) // REFLECT
+			else if (spreadmode == 1) // REFLECT
 				cairo_pattern_set_extend(pattern, CAIRO_EXTEND_REFLECT);
-			else if (grad.SpreadMode == 2) // REPEAT
+			else if (spreadmode == 2) // REPEAT
 				cairo_pattern_set_extend(pattern, CAIRO_EXTEND_REPEAT);
 
-			for(uint32_t i=0;i<grad.GradientRecords.size();i++)
+			for(uint32_t i=0;i<gradrecords.size();i++)
 			{
-				double ratio = grad.GradientRecords[i].Ratio / 255.0;
-				const RGBA& color=grad.GradientRecords[i].Color;
+				double ratio = gradrecords[i].Ratio / 255.0;
+				const RGBA& color=gradrecords[i].Color;
 				cairo_pattern_add_color_stop_rgba(pattern, ratio,color.rf(), color.gf(),color.bf(), color.af());
 			}
 			break;
@@ -239,7 +236,6 @@ cairo_pattern_t* CairoTokenRenderer::FILLSTYLEToCairo(const FILLSTYLE& style, do
 			cairo_matrix_t mat=style.Matrix;
 			mat.x0 -= style.ShapeBounds.Xmin/20;
 			mat.y0 -= style.ShapeBounds.Ymin/20;
-			cairo_matrix_scale(&mat,scalex,scaley);
 			cairo_status_t st = cairo_matrix_invert(&mat);
 			assert(st == CAIRO_STATUS_SUCCESS);
 			(void)st; // silence warning about unused variable
@@ -270,18 +266,28 @@ cairo_pattern_t* CairoTokenRenderer::FILLSTYLEToCairo(const FILLSTYLE& style, do
 	return pattern;
 }
 
-bool CairoTokenRenderer::cairoPathFromTokens(cairo_t* cr, const tokensVector& tokens, double scaleCorrection, bool skipPaint,float scalex,float scaley,number_t xstart, number_t ystart,bool isMask)
+bool CairoTokenRenderer::cairoPathFromTokens(cairo_t* cr, const tokensVector& tokens, double scaleCorrection, bool skipPaint, bool isMask, number_t xstart, number_t ystart, int* starttoken)
 {
+	if (skipPaint && starttoken && tokens.size()==0)
+	{
+		*starttoken=-1;
+		return true;
+	}
 	cairo_scale(cr, scaleCorrection, scaleCorrection);
 
 	bool empty=true;
 
 	cairo_t *stroke_cr = cairo_create(cairo_get_group_target(cr));
-	cairo_matrix_t mat;
-	cairo_get_matrix(cr,&mat);
-	cairo_set_matrix(stroke_cr, &mat);
+	cairo_scale(stroke_cr, scaleCorrection, scaleCorrection);
+	if (xstart || ystart)
+	{
+		cairo_matrix_t mat;
+		cairo_get_matrix(cr,&mat);
+		cairo_matrix_translate(&mat,-xstart,-ystart);
+		cairo_set_matrix(cr, &mat);
+		cairo_set_matrix(stroke_cr, &mat);
+	}
 	cairo_push_group(stroke_cr);
-
 	// Make sure not to draw anything until a fill is set.
 	cairo_set_operator(stroke_cr, CAIRO_OPERATOR_DEST);
 	cairo_set_operator(cr, CAIRO_OPERATOR_DEST);
@@ -293,17 +299,35 @@ bool CairoTokenRenderer::cairoPathFromTokens(cairo_t* cr, const tokensVector& to
 	int tokentype = 1;
 	while (tokentype)
 	{
-		std::vector<_NR<GeomToken>, reporter_allocator<_NR<GeomToken>>>::const_iterator it;
-		std::vector<_NR<GeomToken>, reporter_allocator<_NR<GeomToken>>>::const_iterator itend;
+		std::vector<uint64_t>::const_iterator it;
+		std::vector<uint64_t>::const_iterator itbegin;
+		std::vector<uint64_t>::const_iterator itend;
 		switch(tokentype)
 		{
 			case 1:
-				it = tokens.filltokens.begin();
+				itbegin = tokens.filltokens.begin();
 				itend = tokens.filltokens.end();
+				if (skipPaint && starttoken)
+				{
+					if (*starttoken >= int(tokens.filltokens.size()))
+					{
+						instroke=true;
+						tokentype=2;
+						itbegin = tokens.stroketokens.begin();
+						itend = tokens.stroketokens.end();
+						it = tokens.stroketokens.begin()+(*starttoken - tokens.filltokens.size());
+					}
+					else
+						it = tokens.filltokens.begin()+ (*starttoken);
+					*starttoken = -1;
+				}
+				else
+					it = tokens.filltokens.begin();
 				tokentype++;
 				break;
 			case 2:
 				it = tokens.stroketokens.begin();
+				itbegin = tokens.stroketokens.begin();
 				itend = tokens.stroketokens.end();
 				tokentype++;
 				break;
@@ -313,77 +337,104 @@ bool CairoTokenRenderer::cairoPathFromTokens(cairo_t* cr, const tokensVector& to
 		}
 		if (tokentype == 0)
 			break;
-		for (;it != itend; it++)
+		while (it != itend && tokentype)
 		{
-			switch((*it)->type)
+			GeomToken p(*it,false);
+			switch(p.type)
 			{
 				case MOVE:
-					PATH(cairo_move_to, (*it)->p1.x*scalex-xstart*scalex, (*it)->p1.y*scaley-ystart*scaley);
+				{
+					GeomToken p1(*(++it),false);
+					PATH(cairo_move_to, (p1.vec.x), (p1.vec.y));
 					break;
+				}
 				case STRAIGHT:
-					PATH(cairo_line_to, (*it)->p1.x*scalex-xstart*scalex, (*it)->p1.y*scaley-ystart*scaley);
+				{
+					GeomToken p1(*(++it),false);
+					PATH(cairo_line_to, (p1.vec.x), (p1.vec.y));
 					empty = false;
 					break;
+				}
 				case CURVE_QUADRATIC:
+				{
+					GeomToken p1(*(++it),false);
+					GeomToken p2(*(++it),false);
 					PATH(quadraticBezier,
-					   (*it)->p1.x*scalex-xstart*scalex, (*it)->p1.y*scaley-ystart*scaley,
-					   (*it)->p2.x*scalex-xstart*scalex, (*it)->p2.y*scaley-ystart*scaley);
+					   (p1.vec.x), (p1.vec.y),
+					   (p2.vec.x), (p2.vec.y));
 					empty = false;
 					break;
+				}
 				case CURVE_CUBIC:
+				{
+					GeomToken p1(*(++it),false);
+					GeomToken p2(*(++it),false);
+					GeomToken p3(*(++it),false);
 					PATH(cairo_curve_to,
-					   (*it)->p1.x*scalex-xstart*scalex, (*it)->p1.y*scaley-ystart*scaley,
-					   (*it)->p2.x*scalex-xstart*scalex, (*it)->p2.y*scaley-ystart*scaley,
-					   (*it)->p3.x*scalex-xstart*scalex, (*it)->p3.y*scaley-ystart*scaley);
+					   (p1.vec.x), (p1.vec.y),
+					   (p2.vec.x), (p2.vec.y),
+					   (p3.vec.x), (p3.vec.y));
 					empty = false;
 					break;
+				}
 				case SET_FILL:
 				{
+					GeomToken p1(*(++it),false);
 					if(skipPaint)
+					{
+						if (starttoken)
+						{
+							cairo_close_path(cr);
+							*starttoken=it-itbegin + 1 +(tokentype > 2 ? tokens.filltokens.size() : 0);
+							tokentype=0;
+						}
 						break;
-	
+					}
 					cairo_fill(cr);
-	
 					cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-	
-					const FILLSTYLE& style = (*it)->fillStyle;
-					if (style.FillStyleType == NON_SMOOTHED_CLIPPED_BITMAP ||
-						style.FillStyleType == NON_SMOOTHED_REPEATING_BITMAP)
+					const FILLSTYLE* style = p1.fillStyle;
+					if (style->FillStyleType == NON_SMOOTHED_CLIPPED_BITMAP ||
+						style->FillStyleType == NON_SMOOTHED_REPEATING_BITMAP)
 						cairo_set_antialias(cr,CAIRO_ANTIALIAS_NONE);
-					cairo_pattern_t* pattern = FILLSTYLEToCairo(style, scaleCorrection,scalex,scaley,isMask);
+					cairo_pattern_t* pattern = FILLSTYLEToCairo(*style, scaleCorrection,isMask);
 					if(pattern)
 					{
 						cairo_set_source(cr, pattern);
 						// Destroy the first reference.
 						cairo_pattern_destroy(pattern);
 					}
-	
 					break;
 				}
 				case SET_STROKE:
 				{
+					GeomToken p1(*(++it),false);
 					instroke = true;
 					if(skipPaint)
-						break;
-	
-					cairo_stroke(stroke_cr);
-	
-					const LINESTYLE2& style = (*it)->lineStyle;
-	
-					cairo_set_operator(stroke_cr, CAIRO_OPERATOR_OVER);
-					if (style.HasFillFlag)
 					{
-						if (style.FillType.FillStyleType == NON_SMOOTHED_CLIPPED_BITMAP ||
-							style.FillType.FillStyleType == NON_SMOOTHED_REPEATING_BITMAP)
+						if (starttoken)
+						{
+							cairo_close_path(cr);
+							*starttoken=it-itbegin + 1 +(tokentype > 2 ? tokens.filltokens.size() : 0);
+							tokentype=0;
+						}
+						break;
+					}
+					cairo_stroke(stroke_cr);
+					const LINESTYLE2* style = p1.lineStyle;
+					cairo_set_operator(stroke_cr, CAIRO_OPERATOR_OVER);
+					if (style->HasFillFlag)
+					{
+						if (style->FillType.FillStyleType == NON_SMOOTHED_CLIPPED_BITMAP ||
+							style->FillType.FillStyleType == NON_SMOOTHED_REPEATING_BITMAP)
 							cairo_set_antialias(cr,CAIRO_ANTIALIAS_NONE);
-						cairo_pattern_t* pattern = FILLSTYLEToCairo(style.FillType, scaleCorrection,scalex,scaley,isMask);
+						cairo_pattern_t* pattern = FILLSTYLEToCairo(style->FillType, scaleCorrection,isMask);
 						if (pattern)
 						{
 							cairo_set_source(stroke_cr, pattern);
 							cairo_pattern_destroy(pattern);
 						}
 					} else {
-						const RGBA& color = style.Color;
+						const RGBA& color = style->Color;
 						float r,g,b,a;
 						r = color.rf();
 						g = color.gf();
@@ -391,86 +442,98 @@ bool CairoTokenRenderer::cairoPathFromTokens(cairo_t* cr, const tokensVector& to
 						a = isMask ? 1.0 : color.af();
 						cairo_set_source_rgba(stroke_cr, r, g, b, a);
 					}
-	
 					// TODO: EndCapStyle
-					if (style.StartCapStyle == 0)
+					if (style->StartCapStyle == 0)
 						cairo_set_line_cap(stroke_cr, CAIRO_LINE_CAP_ROUND);
-					else if (style.StartCapStyle == 1)
+					else if (style->StartCapStyle == 1)
 						cairo_set_line_cap(stroke_cr, CAIRO_LINE_CAP_BUTT);
-					else if (style.StartCapStyle == 2)
+					else if (style->StartCapStyle == 2)
 						cairo_set_line_cap(stroke_cr, CAIRO_LINE_CAP_SQUARE);
-	
-					if (style.JointStyle == 0)
+
+					if (style->JointStyle == 0)
 						cairo_set_line_join(stroke_cr, CAIRO_LINE_JOIN_ROUND);
-					else if (style.JointStyle == 1)
+					else if (style->JointStyle == 1)
 						cairo_set_line_join(stroke_cr, CAIRO_LINE_JOIN_BEVEL);
-					else if (style.JointStyle == 2) {
+					else if (style->JointStyle == 2) {
 						cairo_set_line_join(stroke_cr, CAIRO_LINE_JOIN_MITER);
-						cairo_set_miter_limit(stroke_cr, style.MiterLimitFactor);
+						cairo_set_miter_limit(stroke_cr, style->MiterLimitFactor);
 					}
-	
 					//Width == 0 should be a hairline, but
 					//cairo does not support hairlines.
 					//Line width 1 is not a perfect
 					//substitute, because it is affected
 					//by transformations.
-					if (style.Width == 0)
+					if (style->Width == 0)
 						cairo_set_line_width(stroke_cr, 1);
-					else if (style.Width < 20) // would result in line with < 1 what seems to lead to no rendering at all
+					else if (style->Width < 20) // would result in line with < 1 what seems to lead to no rendering at all
 						cairo_set_line_width(stroke_cr, 5);
 					else 
 					{
-						double linewidth = (double)(style.Width / 20.0 / scaleCorrection);
+						double linewidth = (double)(style->Width / 20.0 / scaleCorrection);
 						//cairo_device_to_user_distance(stroke_cr, &linewidth, &linewidth);
 						cairo_set_line_width(stroke_cr, linewidth);
 					}
 					break;
 				}
-	
 				case CLEAR_FILL:
 				case FILL_KEEP_SOURCE:
 					if(skipPaint)
+					{
+						if (starttoken)
+						{
+							cairo_close_path(cr);
+							*starttoken=it-itbegin + 1 +(tokentype > 2 ? tokens.filltokens.size() : 0);
+							tokentype=0;
+						}
 						break;
-	
+					}
 					cairo_fill(cr);
-	
-					if((*it)->type==CLEAR_FILL)
+					if(p.type==CLEAR_FILL)
 						// Clear source.
 						cairo_set_operator(cr, CAIRO_OPERATOR_DEST);
 					break;
 				case CLEAR_STROKE:
 					instroke = false;
 					if(skipPaint)
+					{
+						if (starttoken)
+						{
+							cairo_close_path(cr);
+							*starttoken=it-itbegin + 1 +(tokentype > 2 ? tokens.filltokens.size() : 0);
+							tokentype=0;
+						}
 						break;
-	
+					}
 					cairo_stroke(stroke_cr);
-	
 					// Clear source.
 					cairo_set_operator(stroke_cr, CAIRO_OPERATOR_DEST);
 					break;
 				case FILL_TRANSFORM_TEXTURE:
 				{
+					GeomToken p1(*(++it),false);
+					GeomToken p2(*(++it),false);
+					GeomToken p3(*(++it),false);
+					GeomToken p4(*(++it),false);
+					GeomToken p5(*(++it),false);
+					GeomToken p6(*(++it),false);
 					if(skipPaint)
 						break;
-	
 					cairo_matrix_t origmat;
 					cairo_pattern_t* pattern;
 					pattern=cairo_get_source(cr);
 					cairo_pattern_get_matrix(pattern, &origmat);
-	
-					cairo_pattern_set_matrix(pattern, &(*it)->textureTransform);
-	
+					MATRIX m(p1.value,p2.value,p3.value,p4.value,p5.value,p6.value);
+					cairo_pattern_set_matrix(pattern, &m);
 					cairo_fill(cr);
-	
 					cairo_pattern_set_matrix(pattern, &origmat);
 					break;
 				}
 				default:
 					assert(false);
 			}
+			it++;
 		}
 	}
-
 	#undef PATH
 
 	if(!skipPaint)
@@ -508,19 +571,20 @@ cairo_surface_t* CairoRenderer::allocateSurface(uint8_t*& buf)
 	return cairo_image_surface_create_for_data(buf, CAIRO_FORMAT_ARGB32, width, height, cairoWidthStride);
 }
 
-void CairoTokenRenderer::executeDraw(cairo_t* cr, float scalex, float scaley)
+void CairoTokenRenderer::executeDraw(cairo_t* cr)
 {
 	cairo_set_antialias(cr,smoothing ? CAIRO_ANTIALIAS_DEFAULT : CAIRO_ANTIALIAS_NONE);
 	cairo_set_operator (cr, CAIRO_OPERATOR_OVER);
 	cairo_set_fill_rule(cr, CAIRO_FILL_RULE_EVEN_ODD);
-
-	cairoPathFromTokens(cr, tokens, scaleFactor, false,scalex, scaley,xstart,ystart,isMask);
+	cairoPathFromTokens(cr, tokens, scaleFactor, false,isMask,xstart,ystart);
 }
 
-uint8_t* CairoRenderer::getPixelBuffer(float scalex, float scaley, bool *isBufferOwner)
+uint8_t* CairoRenderer::getPixelBuffer(bool *isBufferOwner, uint32_t* bufsize)
 {
 	if (isBufferOwner)
 		*isBufferOwner=true;
+	if (bufsize)
+		*bufsize=width*height*4;
 	if(width==0 || height==0 || !Config::getConfig()->isRenderingEnabled())
 		return nullptr;
 
@@ -538,10 +602,10 @@ uint8_t* CairoRenderer::getPixelBuffer(float scalex, float scaley, bool *isBuffe
 	{
 		if(masks[i].maskMode != HARD_MASK)
 			continue;
-		masks[i].m->applyCairoMask(cr,xOffset,yOffset,scalex,scaley);
+		masks[i].m->applyCairoMask(cr,xOffset,yOffset);
 	}
 
-	executeDraw(cr,scalex, scaley);
+	executeDraw(cr);
 
 	cairo_surface_t* maskSurface = nullptr;
 	uint8_t* maskRawData = nullptr;
@@ -554,7 +618,7 @@ uint8_t* CairoRenderer::getPixelBuffer(float scalex, float scaley, bool *isBuffe
 		if(masks[i].maskMode != SOFT_MASK)
 			continue;
 		//TODO: this may be optimized if needed
-		uint8_t* maskData = masks[i].m->getPixelBuffer(scalex,scaley);
+		uint8_t* maskData = masks[i].m->getPixelBuffer();
 		if(maskData==nullptr)
 			continue;
 
@@ -590,7 +654,7 @@ uint8_t* CairoRenderer::getPixelBuffer(float scalex, float scaley, bool *isBuffe
 		cairo_surface_destroy(maskSurface);
 		delete[] maskRawData;
 	}
-
+//	cairo_surface_write_to_png(cairoSurface,"/tmp/cairo.png");
 	cairo_destroy(cr);
 	return ret;
 }
@@ -598,47 +662,55 @@ uint8_t* CairoRenderer::getPixelBuffer(float scalex, float scaley, bool *isBuffe
 bool CairoTokenRenderer::hitTest(const tokensVector& tokens, float scaleFactor, number_t x, number_t y)
 {
 	cairo_surface_t* cairoSurface=cairo_image_surface_create_for_data(nullptr, CAIRO_FORMAT_ARGB32, 0, 0, 0);
-	cairo_t *cr=cairo_create(cairoSurface);
-	cairo_set_operator (cr, CAIRO_OPERATOR_OVER);
-	cairo_set_fill_rule(cr, CAIRO_FILL_RULE_WINDING);
 
-	bool empty=cairoPathFromTokens(cr, tokens, scaleFactor, true,1.0,1.0,0,0,true);
+	int starttoken=0;
 	bool ret=false;
-	if(!empty)
+	bool empty=true;
+	while (starttoken >=0)
 	{
-		/* reset the matrix so x and y are not scaled
-		 * by the current cairo transformation
-		 */
-		cairo_identity_matrix(cr);
-		ret=cairo_in_fill(cr, x, y);
+		// loop over all paths of the tokenvector separately
+		cairo_t *cr=cairo_create(cairoSurface);
+		cairo_set_operator (cr, CAIRO_OPERATOR_OVER);
+		cairo_set_fill_rule(cr, CAIRO_FILL_RULE_EVEN_ODD);
+		empty=cairoPathFromTokens(cr, tokens, scaleFactor, true,true,0,0,&starttoken);
+		if(!empty)
+		{
+			/* reset the matrix so x and y are not scaled
+			 * by the current cairo transformation
+			 */
+			cairo_identity_matrix(cr);
+			ret=cairo_in_fill(cr, x, y);
+			if (ret)
+				break;
+		}
+		cairo_destroy(cr);
 	}
-	cairo_destroy(cr);
 	cairo_surface_destroy(cairoSurface);
 	return ret;
 }
 
-void CairoTokenRenderer::applyCairoMask(cairo_t* cr,int32_t xOffset,int32_t yOffset, float scalex, float scaley) const
+void CairoTokenRenderer::applyCairoMask(cairo_t* cr,int32_t xOffset,int32_t yOffset) const
 {
 	cairo_matrix_t mat;
 	cairo_get_matrix(cr,&mat);
 	cairo_translate(cr,xOffset,yOffset);
 	cairo_set_matrix(cr,&mat);
 	
-	cairoPathFromTokens(cr, tokens, scaleFactor, true,scalex,scaley,xstart,ystart,true);
+	cairoPathFromTokens(cr, tokens, scaleFactor, true,true,xstart,ystart);
 	cairo_clip(cr);
 }
 
 CairoTokenRenderer::CairoTokenRenderer(const tokensVector &_g, const MATRIX &_m, int32_t _x, int32_t _y, int32_t _w, int32_t _h
 									   , int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r
-									   , float _xs, float _ys, bool _im, bool _hm, float _s, float _a
+									   , float _xs, float _ys, bool _im, _NR<DisplayObject> _mask, float _s, float _a
 									   , const std::vector<IDrawable::MaskData> &_ms
 									   , float _redMultiplier,float _greenMultiplier,float _blueMultiplier,float _alphaMultiplier
 									   , float _redOffset,float _greenOffset,float _blueOffset,float _alphaOffset
-									   , bool _smoothing, number_t _xmin, number_t _ymin)
-	: CairoRenderer(_m,_x,_y,_w,_h,_rx,_ry,_rw,_rh,_r,_xs,_ys,_im,_hm,_s,_a,_ms
+									   , bool _smoothing, number_t _xstart, number_t _ystart)
+	: CairoRenderer(_m,_x,_y,_w,_h,_rx,_ry,_rw,_rh,_r,_xs,_ys,_im,_mask,_s,_a,_ms
 					, _redMultiplier,_greenMultiplier,_blueMultiplier,_alphaMultiplier
 					, _redOffset,_greenOffset,_blueOffset,_alphaOffset
-					,_smoothing,_xmin,_ymin),tokens(_g)
+					,_smoothing),tokens(_g),xstart(_xstart),ystart(_ystart)
 {
 }
 
@@ -647,7 +719,7 @@ void CairoRenderer::convertBitmapWithAlphaToCairo(std::vector<uint8_t, reporter_
 {
 	*stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, width);
 	*dataSize = *stride * height;
-	data.resize(*dataSize, 0);
+	data.resize(*dataSize);
 	uint8_t* outData=&data[0];
 
 	for(uint32_t i = 0; i < height; i++)
@@ -717,11 +789,21 @@ void CairoRenderer::convertBitmapToCairo(std::vector<uint8_t, reporter_allocator
 	}
 }
 
-void CairoPangoRenderer::pangoLayoutFromData(PangoLayout* layout, const TextData& tData)
+void CairoPangoRenderer::pangoLayoutFromData(PangoLayout* layout, const TextData& tData, uint32_t line)
 {
 	PangoFontDescription* desc;
 
-	pango_layout_set_text(layout, tData.text.raw_buf(), -1);
+	assert(line==UINT32_MAX || tData.getLineCount()>line);
+	tiny_string text = tData.getText(line);
+	if (tData.isPassword)
+	{
+		tiny_string pwtxt;
+		for (uint32_t i = 0; i < text.numChars(); i++)
+			pwtxt+="*";
+		pango_layout_set_text(layout, pwtxt.raw_buf(), -1);
+	}
+	else
+		pango_layout_set_text(layout, text.raw_buf(), -1);
 
 	/* setup alignment */
 	PangoAlignment alignment;
@@ -749,6 +831,7 @@ void CairoPangoRenderer::pangoLayoutFromData(PangoLayout* layout, const TextData
 			return; // silence warning about uninitialised alignment
 	}
 	pango_layout_set_alignment(layout,alignment);
+	pango_layout_set_spacing(layout,PANGO_SCALE*tData.leading);
 
 	//In case wordWrap is true, we already have the right width
 	if(tData.wordWrap == true)
@@ -760,12 +843,14 @@ void CairoPangoRenderer::pangoLayoutFromData(PangoLayout* layout, const TextData
 	/* setup font description */
 	desc = pango_font_description_new();
 	pango_font_description_set_family(desc, tData.font.raw_buf());
-	pango_font_description_set_size(desc, PANGO_SCALE*tData.fontSize);
+	pango_font_description_set_absolute_size(desc, PANGO_SCALE*tData.fontSize);
+	pango_font_description_set_style(desc,tData.isItalic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
+	pango_font_description_set_weight(desc,tData.isBold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
 	pango_layout_set_font_description(layout, desc);
 	pango_font_description_free(desc);
 }
 
-void CairoPangoRenderer::executeDraw(cairo_t* cr, float /*scalex*/, float /*scaley*/)
+void CairoPangoRenderer::executeDraw(cairo_t* cr)
 {
 	PangoLayout* layout;
 
@@ -811,40 +896,46 @@ void CairoPangoRenderer::executeDraw(cairo_t* cr, float /*scalex*/, float /*scal
 	{
 		cairo_set_source_rgb(cr, textData.borderColor.Red/255., textData.borderColor.Green/255., textData.borderColor.Blue/255.);
 		cairo_set_line_width(cr, 1);
-		cairo_rectangle(cr, 0, 0, textData.width, textData.height);
-		cairo_stroke_preserve(cr);
+		cairo_rectangle(cr, 0, 0, this->width, this->height);
+		cairo_stroke(cr);
 	}
 	if(textData.caretblinkstate)
 	{
-		uint32_t w,h,tw,th;
-		tw=0;
-		tiny_string currenttext = textData.text;
-		if (caretIndex < currenttext.numChars())
+		uint32_t tw=TEXTFIELD_PADDING;
+		uint32_t thstart=TEXTFIELD_PADDING;
+		uint32_t thend=PANGO_PIXELS(PANGO_SCALE*textData.fontSize)+TEXTFIELD_PADDING;
+		if (!textData.textlines.empty())
 		{
-			textData.text = textData.text.substr(0,caretIndex);
+			uint32_t w,h,tw1,th1;
+			tiny_string currenttext = textData.getText(0);
+			if (caretIndex < currenttext.numChars())
+			{
+				textData.textlines[0].text = textData.textlines[0].text.substr(0,caretIndex);
+			}
+			getBounds(textData,w,h,tw1,th1,0);
+			textData.textlines[0].text = currenttext;
+			tw += tw1;
 		}
-		getBounds(textData,w,h,tw,th);
-		textData.text = currenttext;
 		tw+=xpos;
 		cairo_set_source_rgb(cr, 0, 0, 0);
 		cairo_set_line_width(cr, 2);
-		cairo_move_to(cr,tw,2);
-		cairo_line_to(cr,tw, textData.height-2);
-		cairo_stroke_preserve(cr);
+		cairo_move_to(cr,tw, thstart);
+		cairo_line_to(cr,tw, thend);
+		cairo_stroke(cr);
 	}
 
 	g_object_unref(layout);
 }
 
-bool CairoPangoRenderer::getBounds(const TextData& _textData, uint32_t& w, uint32_t& h, uint32_t& tw, uint32_t& th)
+bool CairoPangoRenderer::getBounds(const TextData& _textData, uint32_t& w, uint32_t& h, uint32_t& tw, uint32_t& th, uint32_t line)
 {
-	cairo_surface_t* cairoSurface=cairo_image_surface_create_for_data(NULL, CAIRO_FORMAT_ARGB32, 0, 0, 0);
+	cairo_surface_t* cairoSurface=cairo_image_surface_create_for_data(nullptr, CAIRO_FORMAT_ARGB32, 0, 0, 0);
 	cairo_t *cr=cairo_create(cairoSurface);
 
 	PangoLayout* layout;
 
 	layout = pango_cairo_create_layout(cr);
-	pangoLayoutFromData(layout, _textData);
+	pangoLayoutFromData(layout, _textData,line);
 
 	PangoRectangle ink_rect, logical_rect;
 	pango_layout_get_pixel_extents(layout,&ink_rect,&logical_rect);//TODO: check the rounding during pango conversion
@@ -854,15 +945,14 @@ bool CairoPangoRenderer::getBounds(const TextData& _textData, uint32_t& w, uint3
 	cairo_surface_destroy(cairoSurface);
 
 	//This should be safe check precision
-	tw = ink_rect.width;
-	th = ink_rect.height;
+	tw = ink_rect.width + ink_rect.x;
+	th = ink_rect.height + ink_rect.y;
 	if(_textData.autoSize != TextData::AUTO_SIZE::AS_NONE)
 	{
 		h = logical_rect.height;
 		if(!_textData.wordWrap)
 			w = logical_rect.width;
 	}
-
 	return (h!=0) && (w!=0);
 }
 
@@ -895,6 +985,7 @@ std::vector<LineData> CairoPangoRenderer::getLineData(const TextData& _textData)
 	PangoLayout* layout;
 	layout = pango_cairo_create_layout(cr);
 	pangoLayoutFromData(layout, _textData);
+	tiny_string text = _textData.getText();
 
 	int XOffset = _textData.scrollH;
 	int YOffset = PANGO_PIXELS(lineExtents(layout, _textData.scrollV-1).y);
@@ -910,8 +1001,8 @@ std::vector<LineData> CairoPangoRenderer::getLineData(const TextData& _textData)
 				  PANGO_PIXELS(rect.y) - YOffset,
 				  PANGO_PIXELS(rect.width),
 				  PANGO_PIXELS(rect.height),
-				  _textData.text.bytePosToIndex(line->start_index),
-				  _textData.text.substr_bytes(line->start_index, line->length).numChars(),
+				  text.bytePosToIndex(line->start_index),
+				  text.substr_bytes(line->start_index, line->length).numChars(),
 				  PANGO_PIXELS(PANGO_ASCENT(rect)),
 				  PANGO_PIXELS(PANGO_DESCENT(rect)),
 				  PANGO_PIXELS(PANGO_LBEARING(rect)),
@@ -926,12 +1017,12 @@ std::vector<LineData> CairoPangoRenderer::getLineData(const TextData& _textData)
 	return data;
 }
 
-void CairoPangoRenderer::applyCairoMask(cairo_t* cr, int32_t xOffset, int32_t yOffset, float scalex, float scaley) const
+void CairoPangoRenderer::applyCairoMask(cairo_t* cr, int32_t xOffset, int32_t yOffset) const
 {
 	assert(false);
 }
 
-AsyncDrawJob::AsyncDrawJob(IDrawable* d, _R<DisplayObject> o):drawable(d),owner(o),surfaceBytes(nullptr),uploadNeeded(false)
+AsyncDrawJob::AsyncDrawJob(IDrawable* d, _R<DisplayObject> o):drawable(d),owner(o),surfaceBytes(nullptr),uploadNeeded(false),isBufferOwner(true)
 {
 }
 
@@ -939,22 +1030,18 @@ AsyncDrawJob::~AsyncDrawJob()
 {
 	owner->getSystemState()->AsyncDrawJobCompleted(this);
 	delete drawable;
-	if (surfaceBytes)
+	if (surfaceBytes && isBufferOwner)
 		delete[] surfaceBytes;
 }
 
 void AsyncDrawJob::execute()
 {
-	SystemState* sys = owner->getSystemState();
-	float scalex;
-	float scaley;
-	int offx,offy;
-	sys->stageCoordinateMapping(sys->getRenderThread()->windowWidth,sys->getRenderThread()->windowHeight,offx,offy, scalex,scaley);
-
+	owner->startDrawJob();
 	if(!threadAborting)
-		surfaceBytes=drawable->getPixelBuffer(scalex,scaley);
+		surfaceBytes=drawable->getPixelBuffer(&isBufferOwner);
 	if(!threadAborting && surfaceBytes)
 		uploadNeeded=true;
+	owner->endDrawJob();
 }
 
 void AsyncDrawJob::threadAbort()
@@ -1013,7 +1100,8 @@ const TextureChunk& AsyncDrawJob::getTexture()
 	surface.xscale = drawable->getXScale();
 	surface.yscale = drawable->getYScale();
 	surface.isMask = drawable->getIsMask();
-	surface.hasMask = drawable->getHasMask();
+	surface.mask = drawable->getMask();
+	surface.smoothing = drawable->getSmoothing();
 	surface.redMultiplier=drawable->getRedMultiplier();
 	surface.greenMultiplier=drawable->getGreenMultiplier();
 	surface.blueMultiplier=drawable->getBlueMultiplier();
@@ -1022,6 +1110,8 @@ const TextureChunk& AsyncDrawJob::getTexture()
 	surface.greenOffset=drawable->getGreenOffset();
 	surface.blueOffset=drawable->getBlueOffset();
 	surface.alphaOffset=drawable->getAlphaOffset();
+	surface.matrix=drawable->getMatrix();
+	surface.isValid=true;
 	return *surface.tex;
 }
 
@@ -1052,21 +1142,89 @@ IDrawable::~IDrawable()
 	}
 }
 
-BitmapRenderer::BitmapRenderer(_NR<BitmapContainer> _data, int32_t _x, int32_t _y, int32_t _w, int32_t _h, int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r, float _xs, float _ys, bool _im, bool _hm,
+BitmapRenderer::BitmapRenderer(_NR<BitmapContainer> _data, int32_t _x, int32_t _y, int32_t _w, int32_t _h, int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r, float _xs, float _ys, bool _im, _NR<DisplayObject> _mask,
 		float _a, const std::vector<MaskData>& _ms,
 		float _redMultiplier, float _greenMultiplier, float _blueMultiplier, float _alphaMultiplier,
-		float _redOffset, float _greenOffset, float _blueOffset, float _alphaOffset)
-	: IDrawable(_w, _h, _x, _y, _rw, _rh, _rx, _ry, _r, _xs, _ys, _im, _hm,_a, _ms,
+		float _redOffset, float _greenOffset, float _blueOffset, float _alphaOffset, bool _smoothing, const MATRIX& _m)
+	: IDrawable(_w, _h, _x, _y, _rw, _rh, _rx, _ry, _r, _xs, _ys, _im, _mask,_a, _ms,
 				_redMultiplier,_greenMultiplier,_blueMultiplier,_alphaMultiplier,
-				_redOffset,_greenOffset,_blueOffset,_alphaOffset)
+				_redOffset,_greenOffset,_blueOffset,_alphaOffset,_smoothing,_m)
 	, data(_data)
 {
 }
 
-uint8_t *BitmapRenderer::getPixelBuffer(float scalex, float scaley, bool *isBufferOwner)
+uint8_t *BitmapRenderer::getPixelBuffer(bool *isBufferOwner, uint32_t* bufsize)
 {
 	if (isBufferOwner)
 		*isBufferOwner=false;
+	if (bufsize)
+		*bufsize=data->getWidth()*data->getHeight()*4;
 	return data->getData();
 }
 
+
+void CharacterRenderer::upload(uint8_t *data, uint32_t w, uint32_t h)
+{
+	memcpy(data, this->data, w*h*4);
+}
+
+const TextureChunk& CharacterRenderer::getTexture()
+{
+	if(!chunk.resizeIfLargeEnough(width, height))
+	chunk=getSys()->getRenderThread()->allocateTexture(width, height,false);
+	return chunk;
+}
+
+tiny_string TextData::getText(uint32_t line) const
+{
+	tiny_string text;
+	if (line == UINT32_MAX)
+	{
+		for (auto it = textlines.begin(); it != textlines.end(); it++)
+		{
+			if (!text.empty())
+				text += "\n";
+			text += (*it).text;
+		}
+	}
+	else if (textlines.size() > line)
+		text = textlines[line].text;
+	return text;
+}
+
+void TextData::setText(const char* text)
+{
+	textlines.clear();
+	if (*text == 0x00)
+		return;
+	tiny_string t = text;
+	uint32_t index = tiny_string::npos;
+	uint32_t index1 = tiny_string::npos;
+	uint32_t index2 = tiny_string::npos;
+	do
+	{
+		index1 = t.find("\n");
+		index2 = t.find("\r");
+		index = min(index1,index2);
+		textline line;
+		line.autosizeposition=0;
+		line.textwidth=UINT32_MAX;
+		if (index != tiny_string::npos)
+		{
+			line.text = t.substr_bytes(0,index).raw_buf();
+			if (index < t.numChars()-1 && (t.charAt(index+1)=='\r' || t.charAt(index+1)=='\n'))
+				t=t.substr_bytes(index+2,UINT32_MAX);
+			else
+				t=t.substr_bytes(index+1,UINT32_MAX);
+		}
+		else
+		{
+			if (t.numBytes() > 0 &&  t.charAt(t.numBytes()-1)=='\r')
+				line.text = t.substr_bytes(0,t.numBytes()-1).raw_buf();
+			else
+				line.text = t.raw_buf();
+		}
+		textlines.push_back(line);
+	}
+	while (index != tiny_string::npos);
+}

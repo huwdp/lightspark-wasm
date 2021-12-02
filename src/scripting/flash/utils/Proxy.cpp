@@ -53,7 +53,7 @@ ASFUNCTIONBODY_ATOM(Proxy,_isAttribute)
 	asAtomHandler::setBool(ret,mname.isAttribute);
 }
 
-multiname *Proxy::setVariableByMultiname(const multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst,bool* alreadyset)
+multiname *Proxy::setVariableByMultiname(multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, bool* alreadyset)
 {
 	//If a variable named like this already exist, use that
 	if(ASObject::hasPropertyByMultiname(name, true, false) || !implEnable)
@@ -95,7 +95,6 @@ multiname *Proxy::setVariableByMultiname(const multiname& name, asAtom& o, CONST
 GET_VARIABLE_RESULT Proxy::getVariableByMultiname(asAtom& ret, const multiname& name, GET_VARIABLE_OPTION opt)
 {
 	//It seems that various kind of implementation works only with the empty namespace
-	assert_and_throw(name.ns.size()>0);
 	asAtom o=asAtomHandler::invalidAtom;
 	GET_VARIABLE_RESULT res = GET_VARIABLE_RESULT::GETVAR_NORMAL;
 	LOG_CALL("Proxy::getVar "<< name << " " << this->toDebugString()<<" "<<ASObject::hasPropertyByMultiname(name, true, true));

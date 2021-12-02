@@ -35,6 +35,7 @@ SET(LIBSPARK_SOURCES
   backends/audio.cpp
   backends/builtindecoder.cpp
   backends/config.cpp
+  backends/currency.cpp
   backends/decoder.cpp
   backends/extscriptobject.cpp
   backends/geometry.cpp
@@ -180,6 +181,7 @@ SET(LIBSPARK_SOURCES
   scripting/flash/security/certificatestatus.cpp
   scripting/flash/sensors/flashsensors.cpp
   scripting/flash/system/flashsystem.cpp
+  scripting/flash/system/messagechannel.cpp
   scripting/flash/system/messagechannelstate.cpp
   scripting/flash/system/securitypanel.cpp
   scripting/flash/system/systemupdater.cpp
@@ -260,6 +262,31 @@ SET(LIBSPARK_SOURCES
   3rdparty/avmplus/core/BigInteger.h
   3rdparty/avmplus/core/d2a.cpp
   3rdparty/avmplus/core/d2a.h
+  3rdparty/avmplus/pcre/pcre_chartables.cpp
+  3rdparty/avmplus/pcre/pcre_compile.cpp
+  3rdparty/avmplus/pcre/pcre_config.cpp
+  3rdparty/avmplus/pcre/pcre_dfa_exec.cpp
+  3rdparty/avmplus/pcre/pcre_exec.cpp
+  3rdparty/avmplus/pcre/pcre_fullinfo.cpp
+  3rdparty/avmplus/pcre/pcre_get.cpp
+  3rdparty/avmplus/pcre/pcre_globals.cpp
+  3rdparty/avmplus/pcre/pcre_info.cpp
+  3rdparty/avmplus/pcre/pcre_maketables.cpp
+  3rdparty/avmplus/pcre/pcre_newline.cpp
+  3rdparty/avmplus/pcre/pcre_ord2utf8.cpp
+  3rdparty/avmplus/pcre/pcre_refcount.cpp
+  3rdparty/avmplus/pcre/pcre_study.cpp
+  3rdparty/avmplus/pcre/pcre_tables.cpp
+  3rdparty/avmplus/pcre/pcre_try_flipped.cpp
+  3rdparty/avmplus/pcre/pcre_valid_utf8.cpp
+  3rdparty/avmplus/pcre/pcre_version.cpp
+  3rdparty/avmplus/pcre/pcre_xclass.cpp
+  3rdparty/avmplus/pcre/config.h
+  3rdparty/avmplus/pcre/pcre.h
+  3rdparty/avmplus/pcre/pcre_avmplus.h
+  3rdparty/avmplus/pcre/pcre_internal.h
+  3rdparty/avmplus/pcre/pcreposix.h
+  3rdparty/avmplus/pcre/pcre_scanner.h
   )
 IF(MINGW)
   SET(LIBSPARK_SOURCES ${LIBSPARK_SOURCES} platforms/slowpaths_generic.cpp)
@@ -284,6 +311,7 @@ ENDIF(MINGW)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/scripting)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/3rdparty/jxrlib/jxrgluelib)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/3rdparty/avmplus/pcre)
 # needed for jxr image decoder
 SET_SOURCE_FILES_PROPERTIES(${PROJECT_SOURCE_DIR}/src/scripting/flash/display3d/flashdisplay3dtextures.cpp PROPERTIES COMPILE_FLAGS "-D__ANSI__ -DDISABLE_PERF_MEASUREMENT -Wno-endif-labels -I${PROJECT_SOURCE_DIR}/src/3rdparty/jxrlib/common/include/ -I${PROJECT_SOURCE_DIR}/src/3rdparty/jxrlib/image/sys/")
 SET(CMAKE_C_FLAGS "-D__ANSI__ -DDISABLE_PERF_MEASUREMENT -Wno-endif-labels -I${PROJECT_SOURCE_DIR}/src/3rdparty/jxrlib/common/include -I${PROJECT_SOURCE_DIR}/src/3rdparty/jxrlib/image/sys -I${PROJECT_SOURCE_DIR}/src/3rdparty/jxrlib/common/include")
@@ -291,6 +319,9 @@ SET(CMAKE_C_FLAGS "-D__ANSI__ -DDISABLE_PERF_MEASUREMENT -Wno-endif-labels -I${P
 
 
 # liblightspark.so target
+IF(EMSCRIPTEN)
+  ADD_LIBRARY(spark STATIC ${LIBSPARK_SOURCES})
+ELSE()
 IF(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   ADD_LIBRARY(spark SHARED ${LIBSPARK_SOURCES})
   IF(NOT WIN32)
@@ -310,11 +341,11 @@ ELSE(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     ADD_LIBRARY(spark STATIC ${LIBSPARK_SOURCES})
   ENDIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 ENDIF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+ENDIF(EMSCRIPTEN)
 
 SET(LIGHTSPARK_ALL_LIBRARIES ${CAIRO_LIBRARIES} ${ZLIB_LIBRARIES}
 	${LLVM_LIBS_CORE} ${LLVM_LIBS_JIT} ${LLVM_LDFLAGS}
 	${OPTIONAL_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2MIXER_LIBRARIES} ${FREETYPE_LIBRARIES} ${JPEG_LIBRARIES} ${PNG_LIBRARIES}
-	${PCRE_LIBRARIES}
 	${CMAKE_DL_LIBS} ${EXTRA_LIBS_LIBRARIES})
 IF(WIN32)
 # this is needed so that the resulting binary works on windows7
@@ -325,6 +356,9 @@ IF(WIN32)
 # and add them back in the correct order
 	SET(LIGHTSPARK_ALL_LIBRARIES ${LIGHTSPARK_ALL_LIBRARIES} usp10 gdi32)
 ENDIF(WIN32)
+IF(${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc")
+	SET(LIGHTSPARK_ALL_LIBRARIES ${LIGHTSPARK_ALL_LIBRARIES} atomic)
+ENDIF()
 
 TARGET_LINK_LIBRARIES(spark ${LIGHTSPARK_ALL_LIBRARIES})
 SET_TARGET_PROPERTIES(spark PROPERTIES VERSION "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")

@@ -99,6 +99,7 @@ private:
 	std::map<uint32_t,asAtom> avm1variables;
 	std::map<uint32_t,_NR<AVM1Function>> avm1functions;
 protected:
+	_NR<Bitmap> cachedBitmap;
 	std::multimap<uint32_t,_NR<DisplayObject>> variablebindings;
 	bool onStage;
 	bool visible;
@@ -109,7 +110,7 @@ protected:
 	_NR<DisplayObject> mask;
 	mutable Mutex spinlock;
 	void computeBoundsForTransformedRect(number_t xmin, number_t xmax, number_t ymin, number_t ymax,
-			int32_t& outXMin, int32_t& outYMin, uint32_t& outWidth, uint32_t& outHeight,
+			number_t& outXMin, number_t& outYMin, number_t& outWidth, number_t& outHeight,
 			const MATRIX& m) const;
 	/*
 	 * Assume the lock is held and the matrix will not change
@@ -128,7 +129,7 @@ protected:
 	{
 		return boundsRect(xmin, xmax, ymin, ymax);
 	}
-	bool boundsRectGlobal(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const;
+	bool boundsRectGlobal(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax);
 	virtual bool renderImpl(RenderContext& ctxt) const
 	{
 		throw RunTimeException("DisplayObject::renderImpl: Derived class must implement this!");
@@ -149,6 +150,9 @@ public:
 	ASPROPERTY_GETTER_SETTER(_NR<Array>,filters);
 	ASPROPERTY_GETTER_SETTER(_NR<Rectangle>,scrollRect);
 	_NR<ColorTransform> colorTransform;
+	// pointer to the ancestor of this DisplayObject that is cached as Bitmap
+	_NR<DisplayObject> cachedAsBitmapOf;
+	void invalidateCachedAsBitmapOf();
 	void setNeedsTextureRecalculation(bool skippable=false);
 	void resetNeedsTextureRecalculation() { needsTextureRecalculation=false; }
 	bool getNeedsTextureRecalculation() const { return needsTextureRecalculation; }
@@ -163,8 +167,11 @@ public:
 	 * cacheAsBitmap is true also if any filter is used
 	 */
 	bool computeCacheAsBitmap() const;
-	void computeMasksAndMatrix(DisplayObject* target, std::vector<IDrawable::MaskData>& masks, MATRIX& totalMatrix, bool includeRotation, bool &isMask, bool &hasMask) const;
+	bool requestInvalidationForCacheAsBitmap(InvalidateQueue* q);
+	void computeMasksAndMatrix(const DisplayObject *target, std::vector<IDrawable::MaskData>& masks, MATRIX& totalMatrix, bool includeRotation, bool &isMask, _NR<DisplayObject>& mask) const;
 	ASPROPERTY_GETTER_SETTER(bool,cacheAsBitmap);
+	IDrawable* getCachedBitmapDrawable(DisplayObject* target, const MATRIX& initialMatrix, _NR<DisplayObject>* pcachedBitmap);
+	_NR<DisplayObject> getCachedBitmap() const { return cachedBitmap; }
 	DisplayObjectContainer* getParent() const { return parent; }
 	bool findParent(DisplayObject* d) const;
 	void setParent(DisplayObjectContainer* p);
@@ -182,7 +189,7 @@ public:
 	 * _must_ be on the parent chain of this
 	 * @param initialMatrix A matrix that will be prepended to all transformations
 	 */
-	virtual IDrawable* invalidate(DisplayObject* target, const MATRIX& initialMatrix, bool smoothing);
+	virtual IDrawable* invalidate(DisplayObject* target, const MATRIX& initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap);
 	virtual void requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh=false);
 	void updateCachedSurface(IDrawable* d);
 	MATRIX getConcatenatedMatrix() const;
@@ -193,7 +200,7 @@ public:
 	{
 		throw RunTimeException("DisplayObject::getScaleFactor");
 	}
-	multiname* setVariableByMultiname(const multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, bool* alreadyset=nullptr) override;
+	multiname* setVariableByMultiname(multiname& name, asAtom& o, CONST_ALLOWED_FLAG allowConst, bool* alreadyset=nullptr) override;
 	bool deleteVariableByMultiname(const multiname& name) override;
 	virtual void removeAVM1Listeners();
 	void AVM1registerPrototypeListeners();
@@ -210,11 +217,13 @@ public:
 	virtual void afterLegacyDelete(DisplayObjectContainer* parent) {}
 	virtual uint32_t getTagID() const { return 0;}
 	virtual void resetLegacyState() {}
+	virtual void startDrawJob() {}
+	virtual void endDrawJob() {}
 	
 	bool Render(RenderContext& ctxt,bool force=false);
 	bool getBounds(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax, const MATRIX& m) const;
 	_NR<DisplayObject> hitTest(_NR<DisplayObject> last, number_t x, number_t y, HIT_TYPE type,bool interactiveObjectsOnly);
-	virtual void setOnStage(bool staged, bool force = false);
+	virtual void setOnStage(bool staged, bool force);
 	bool isOnStage() const { return onStage; }
 	bool isMask() const { return !maskOf.isNull(); }
 	// checks for visibility depending on parent visibility 
@@ -225,11 +234,13 @@ public:
 	virtual _NR<RootMovieClip> getRoot();
 	virtual _NR<Stage> getStage();
 	void setLegacyMatrix(const MATRIX& m);
+	void setFilters(const FILTERLIST& filterlist);
 	virtual void advanceFrame() {}
 	virtual void declareFrame() {}
 	virtual void initFrame();
 	virtual void executeFrameScript();
 	virtual bool needsActionScript3() const;
+	virtual void handleMouseCursor(bool rollover) {}
 	Vector2f getLocalMousePos();
 	Vector2f getXY();
 	void setX(number_t x);
@@ -313,12 +324,13 @@ public:
 	static void AVM1SetupMethods(Class_base* c);
 	DisplayObject* AVM1GetClipFromPath(tiny_string& path);
 	void AVM1SetVariable(tiny_string& name, asAtom v, bool setMember=true);
-	asAtom AVM1GetVariable(const tiny_string &name);
+	asAtom AVM1GetVariable(const tiny_string &name, bool checkrootvars=true);
 	void AVM1UpdateVariableBindings(uint32_t nameID, asAtom &value);
 	asAtom getVariableBindingValue(const tiny_string &name) override;
 	void setVariableBinding(tiny_string& name, _NR<DisplayObject> obj);
 	void AVM1SetFunction(uint32_t nameID, _NR<AVM1Function> obj);
 	AVM1Function *AVM1GetFunction(uint32_t nameID);
+	void DrawToBitmap(BitmapData* bm, const MATRIX& initialMatrix, bool smoothing, bool forcachedbitmap);
 };
 }
 #endif /* SCRIPTING_FLASH_DISPLAY_DISPLAYOBJECT_H */

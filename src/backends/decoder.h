@@ -221,8 +221,6 @@ private:
 	void setSize(uint32_t w, uint32_t h);
 	bool fillDataAndCheckValidity();
 	uint32_t curBufferOffset;
-	// used for embedded video
-	uint32_t currentcachedframe;
 	DefineVideoStreamTag* embeddedvideotag;
 public:
 	FFMpegVideoDecoder(LS_VIDEO_CODEC codec, uint8_t* initdata, uint32_t datalen, double frameRateHint,DefineVideoStreamTag* tag=nullptr);
@@ -366,7 +364,7 @@ private:
 	std::vector<uint8_t> overflowBuffer;
 	bool fillDataAndCheckValidity();
 	CodecID LSToFFMpegCodec(LS_AUDIO_CODEC lscodec);
-#ifdef HAVE_AVCODEC_DECODE_AUDIO4
+#if defined HAVE_AVCODEC_DECODE_AUDIO4 || (defined HAVE_AVCODEC_SEND_PACKET && defined HAVE_AVCODEC_RECEIVE_FRAME)
 	AVFrame* frameIn;
 	int resampleFrameToS16(FrameSamples& curTail);
 #endif

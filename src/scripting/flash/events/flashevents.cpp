@@ -31,10 +31,10 @@ using namespace lightspark;
 
 void IEventDispatcher::linkTraits(Class_base* c)
 {
-	lookupAndLink(c,"addEventListener","flash.events:IEventDispatcher");
-	lookupAndLink(c,"removeEventListener","flash.events:IEventDispatcher");
-	lookupAndLink(c,"dispatchEvent","flash.events:IEventDispatcher");
-	lookupAndLink(c,"hasEventListener","flash.events:IEventDispatcher");
+	lookupAndLink(c,STRING_ADDEVENTLISTENER,STRING_FLASH_EVENTS_IEVENTDISPATCHER);
+	lookupAndLink(c,STRING_REMOVEEVENTLISTENER,STRING_FLASH_EVENTS_IEVENTDISPATCHER);
+	lookupAndLink(c,STRING_DISPATCHEVENT,STRING_FLASH_EVENTS_IEVENTDISPATCHER);
+	lookupAndLink(c,STRING_HASEVENTLISTENER,STRING_FLASH_EVENTS_IEVENTDISPATCHER);
 }
 
 Event::Event(Class_base* cb, const tiny_string& t, bool b, bool c, CLASS_SUBTYPE st):
@@ -102,6 +102,13 @@ void Event::sinit(Class_base* c)
 	c->setVariableAtomByQName("USER_IDLE",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"userIdle"),DECLARED_TRAIT);
 	c->setVariableAtomByQName("USER_PRESENT",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"userPresent"),DECLARED_TRAIT);
 
+	c->setVariableAtomByQName("BROWSER_ZOOM_CHANGE",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"browserZoomChange"),DECLARED_TRAIT);
+	c->setVariableAtomByQName("CHANNEL_MESSAGE",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"channelMessage"),DECLARED_TRAIT);
+	c->setVariableAtomByQName("CHANNEL_STATE",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"channelState"),DECLARED_TRAIT);
+	c->setVariableAtomByQName("FRAME_LABEL",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"frameLabel"),DECLARED_TRAIT);
+	c->setVariableAtomByQName("VIDEO_FRAME",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"videoFrame"),DECLARED_TRAIT);
+	c->setVariableAtomByQName("WORKER_STATE",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"workerState"),DECLARED_TRAIT);
+
 	c->setDeclaredMethodByQName("formatToString","",Class<IFunction>::getFunction(c->getSystemState(),formatToString),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("isDefaultPrevented","",Class<IFunction>::getFunction(c->getSystemState(),_isDefaultPrevented),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("preventDefault","",Class<IFunction>::getFunction(c->getSystemState(),_preventDefault),NORMAL_METHOD,true);
@@ -109,7 +116,7 @@ void Event::sinit(Class_base* c)
 	c->setDeclaredMethodByQName("stopPropagation","",Class<IFunction>::getFunction(c->getSystemState(),stopPropagation),NORMAL_METHOD,true);
 	c->setDeclaredMethodByQName("stopImmediatePropagation","",Class<IFunction>::getFunction(c->getSystemState(),stopImmediatePropagation),NORMAL_METHOD,true);
 	REGISTER_GETTER(c,currentTarget);
-	REGISTER_GETTER(c,target);
+	REGISTER_GETTER_RESULTTYPE(c,target,ASObject);
 	REGISTER_GETTER(c,type);
 	REGISTER_GETTER(c,eventPhase);
 	REGISTER_GETTER(c,bubbles);
@@ -550,7 +557,7 @@ void IOErrorEvent::sinit(Class_base* c)
 	c->setVariableAtomByQName("STANDARD_OUTPUT_IO_ERROR",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"standardOutputIoError"),CONSTANT_TRAIT);
 }
 
-EventDispatcher::EventDispatcher(Class_base* c):ASObject(c),forcedTarget(asAtomHandler::invalidAtom)
+EventDispatcher::EventDispatcher(Class_base* c):ASObject(c),forcedTarget(asAtomHandler::invalidAtom),worker(nullptr)
 {
 }
 
@@ -611,7 +618,8 @@ ASFUNCTIONBODY_ATOM(EventDispatcher,addEventListener)
 
 	if(th->is<DisplayObject>() && (eventName=="enterFrame"
 				|| eventName=="exitFrame"
-				|| eventName=="frameConstructed") )
+				|| eventName=="frameConstructed"
+				|| eventName=="render") )
 	{
 		th->incRef();
 		th->getSystemState()->registerFrameListener(_MR(th->as<DisplayObject>()));
@@ -622,9 +630,17 @@ ASFUNCTIONBODY_ATOM(EventDispatcher,addEventListener)
 		//Search if any listener is already registered for the event
 		list<listener>& listeners=th->handlers[eventName];
 		ASATOM_INCREF(args[1]);
-		const listener newListener(args[1], priority, useCapture);
+		const listener newListener(args[1], priority, useCapture, th->worker);
 		//Ordered insertion
-		list<listener>::iterator insertionPoint=upper_bound(listeners.begin(),listeners.end(),newListener);
+		list<listener>::iterator insertionPoint=lower_bound(listeners.begin(),listeners.end(),newListener);
+		// check if a listener that matches type, use_capture and function is already registered
+		if (insertionPoint != listeners.end() && (*insertionPoint).use_capture == newListener.use_capture)
+		{
+			IFunction* newfunc = asAtomHandler::as<IFunction>(args[1]);
+			IFunction* insertPointFunc = asAtomHandler::as<IFunction>((*insertionPoint).f);
+			if (insertPointFunc == newfunc || (insertPointFunc->clonedFrom && insertPointFunc->clonedFrom == newfunc->clonedFrom && insertPointFunc->closure_this==newfunc->closure_this))
+				return; // don't register the same listener twice
+		}
 		listeners.insert(insertionPoint,newListener);
 	}
 	th->eventListenerAdded(eventName);
@@ -700,7 +716,10 @@ ASFUNCTIONBODY_ATOM(EventDispatcher,dispatchEvent)
 	// Must call the AS getter, because the getter may have been
 	// overridden
 	asAtom target=asAtomHandler::invalidAtom;
-	e->getVariableByMultiname(target,"target", {""});
+	multiname m(nullptr);
+	m.name_type = multiname::NAME_STRING;
+	m.name_s_id = BUILTIN_STRINGS::STRING_TARGET;
+	e->getVariableByMultiname(target,m);
 	if(asAtomHandler::isValid(target) && !asAtomHandler::isNull(target) && !asAtomHandler::isUndefined(target))
 	{
 		//Object must be cloned, cloning is implemented with the clone AS method
@@ -746,7 +765,7 @@ void EventDispatcher::handleEvent(_R<Event> e)
 	if(h==handlers.end())
 		return;
 
-	LOG(LOG_CALLS, _("Handling event ") << h->first);
+	LOG(LOG_CALLS,"Handling event " << h->first<<" "<<getWorker());
 
 	//Create a temporary copy of the listeners, as the list can be modified during the calls
 	vector<listener> tmpListener(h->second.begin(),h->second.end());
@@ -762,6 +781,8 @@ void EventDispatcher::handleEvent(_R<Event> e)
 	{
 		if( (e->eventPhase == EventPhase::BUBBLING_PHASE && tmpListener[i].use_capture)
 		||  (e->eventPhase == EventPhase::CAPTURING_PHASE && !tmpListener[i].use_capture))
+			continue;
+		if (tmpListener[i].worker && tmpListener[i].worker != getWorker()) // only handle listeners that are available in the current worker
 			continue;
 		asAtom arg0= asAtomHandler::fromObject(e.getPtr());
 		IFunction* func = asAtomHandler::as<IFunction>(tmpListener[i].f);
@@ -859,6 +880,7 @@ void FullScreenEvent::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, Event, _constructor, CLASS_SEALED);
 	c->setVariableAtomByQName("FULL_SCREEN",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"fullScreen"),DECLARED_TRAIT);
+	c->setVariableAtomByQName("FULL_SCREEN_INTERACTIVE_ACCEPTED",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"fullScreenInteractiveAccepted"),DECLARED_TRAIT);
 }
 
 ASFUNCTIONBODY_ATOM(FullScreenEvent,_constructor)
@@ -1011,6 +1033,7 @@ void TextEvent::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, Event, _constructor, CLASS_SEALED);
 	c->setVariableAtomByQName("TEXT_INPUT",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"textInput"),DECLARED_TRAIT);
+	c->setVariableAtomByQName("LINK",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"link"),DECLARED_TRAIT);
 	REGISTER_GETTER_SETTER(c,text);
 }
 
@@ -1120,6 +1143,9 @@ void HTTPStatusEvent::sinit(Class_base* c)
 {
 	CLASS_SETUP(c, Event, _constructor, CLASS_SEALED);
 	c->setVariableAtomByQName("HTTP_STATUS",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"httpStatus"),DECLARED_TRAIT);
+
+	// Value is undefined and not "httpResponseStatus" like stated in documentation
+	c->setVariableAtomByQName("HTTP_RESPONSE_STATUS",nsNameAndKind(),asAtomHandler::fromObject(c->getSystemState()->getUndefinedRef()),DECLARED_TRAIT);
 }
 
 ASFUNCTIONBODY_ATOM(HTTPStatusEvent,_constructor)
@@ -1495,10 +1521,10 @@ void SampleDataEvent::sinit(Class_base* c)
 {
 	CLASS_SETUP_NO_CONSTRUCTOR(c, Event, CLASS_SEALED);
 	c->setVariableAtomByQName("SAMPLE_DATA",nsNameAndKind(),asAtomHandler::fromString(c->getSystemState(),"sampleData"),DECLARED_TRAIT);
-	c->setDeclaredMethodByQName("toString","",Class<IFunction>::getFunction(c->getSystemState(),_toString),NORMAL_METHOD,true);
+	c->setDeclaredMethodByQName("toString","",Class<IFunction>::getFunction(c->getSystemState(),_toString,0,Class<ASString>::getRef(c->getSystemState()).getPtr()),NORMAL_METHOD,true);
 	
-	REGISTER_GETTER_SETTER(c, data);
-	REGISTER_GETTER_SETTER(c, position);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c, data,ByteArray);
+	REGISTER_GETTER_SETTER_RESULTTYPE(c, position,Number);
 }
 ASFUNCTIONBODY_GETTER_SETTER(SampleDataEvent,data)
 ASFUNCTIONBODY_GETTER_SETTER(SampleDataEvent,position)

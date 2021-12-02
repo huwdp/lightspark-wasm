@@ -578,6 +578,7 @@ void RenderThread::commonGLInit(int width, int height)
 	scaleUniform=engineData->exec_glGetUniformLocation(gpu_program,"scale");
 	colortransMultiplyUniform=engineData->exec_glGetUniformLocation(gpu_program,"colorTransformMultiply");
 	colortransAddUniform=engineData->exec_glGetUniformLocation(gpu_program,"colorTransformAdd");
+	directColorUniform=engineData->exec_glGetUniformLocation(gpu_program,"directColor");
 
 	//Texturing must be enabled otherwise no tex coord will be sent to the shaders
 	engineData->exec_glEnable_GL_TEXTURE_2D();
@@ -853,6 +854,7 @@ void RenderThread::renderErrorPage(RenderThread *th, bool standalone)
 				0,y);
 	}
 
+	engineData->exec_glUniform1f(directUniform, 0);
 	engineData->exec_glUniform1f(alphaUniform, 1);
 	engineData->exec_glUniform1f(rotateUniform, 0);
 	engineData->exec_glUniform2f(beforeRotateUniform, windowWidth, windowHeight);
@@ -1060,8 +1062,8 @@ TextureChunk RenderThread::allocateTexture(uint32_t w, uint32_t h, bool compact)
 	Locker l(mutexLargeTexture);
 	//Find the number of blocks needed for the given w and h
 	TextureChunk ret(w, h);
-	uint32_t blocksW=(ret.width+CHUNKSIZE-1)/CHUNKSIZE;
-	uint32_t blocksH=(ret.height+CHUNKSIZE-1)/CHUNKSIZE;
+	uint32_t blocksW=(ret.width+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL;
+	uint32_t blocksH=(ret.height+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL;
 	//Try to find a good place in the available textures
 	uint32_t index=0;
 	for(index=0;index<largeTextures.size();index++)
@@ -1110,8 +1112,6 @@ void RenderThread::loadChunkBGRA(const TextureChunk& chunk, uint32_t w, uint32_t
 	//TODO: Detect continuos
 	//The size is ok if doesn't grow over the allocated size
 	//this allows some alignment freedom
-	assert(w<=((chunk.width+CHUNKSIZE-1)&0xffffff80));
-	assert(h<=((chunk.height+CHUNKSIZE-1)&0xffffff80));
 	const uint32_t numberOfChunks=chunk.getNumberOfChunks();
 	const uint32_t blocksPerSide=largeTextureSize/CHUNKSIZE;
 	const uint32_t blocksW=((w+CHUNKSIZE_REAL-1)/CHUNKSIZE_REAL);

@@ -28,12 +28,12 @@
 using namespace lightspark;
 using namespace std;
 
-TokenContainer::TokenContainer(DisplayObject* _o, MemoryAccount* _m) : owner(_o),tokens(reporter_allocator<GeomToken>(_m)), scaling(1.0f)
+TokenContainer::TokenContainer(DisplayObject* _o) : owner(_o), scaling(1.0f)
 {
 }
 
-TokenContainer::TokenContainer(DisplayObject* _o, MemoryAccount* _m, const tokensVector& _tokens, float _scaling) :
-	owner(_o), tokens(reporter_allocator<GeomToken>(_m)), scaling(_scaling)
+TokenContainer::TokenContainer(DisplayObject* _o, const tokensVector& _tokens, float _scaling) :
+	owner(_o), scaling(_scaling)
 
 {
 	tokens.filltokens.assign(_tokens.filltokens.begin(),_tokens.filltokens.end());
@@ -60,34 +60,45 @@ void TokenContainer::FromShaperecordListToShapeVector(const std::vector<SHAPEREC
 	unsigned int color0=0;
 	unsigned int color1=0;
 	unsigned int linestyle=0;
-			
+	vector< vector<ShapePathSegment> >* outlinesForColor0=nullptr;
+	vector<ShapePathSegment>* lastoutlinesForColor0=nullptr;
+	vector< vector<ShapePathSegment> >* outlinesForColor1=nullptr;
+	vector<ShapePathSegment>* lastoutlinesForColor1=nullptr;
+	vector< vector<ShapePathSegment> >* outlinesForStroke=nullptr;
+	vector<ShapePathSegment>* lastoutlinesForStroke=nullptr;
+
 	ShapesBuilder shapesBuilder;
 
 	cursor.x= -shapebounds.Xmin;
 	cursor.y= -shapebounds.Ymin;
-	
+	Vector2 p1(matrix.multiply2D(cursor));
 	for(unsigned int i=0;i<shapeRecords.size();i++)
 	{
 		const SHAPERECORD* cur=&shapeRecords[i];
 		if(cur->TypeFlag)
 		{
+			if (outlinesForColor0 == outlinesForColor1)
+			{
+				lastoutlinesForColor0=nullptr;
+				lastoutlinesForColor1=nullptr;
+			}
 			if(cur->StraightFlag)
 			{
-				Vector2 p1(matrix.multiply2D(cursor));
 				cursor.x += cur->DeltaX;
 				cursor.y += cur->DeltaY;
 				Vector2 p2(matrix.multiply2D(cursor));
 
 				if(color0)
-					shapesBuilder.extendFilledOutlineForColor(color0,p1,p2);
+					lastoutlinesForColor0=shapesBuilder.extendOutline(outlinesForColor0,p1,p2,lastoutlinesForColor0);
 				if(color1)
-					shapesBuilder.extendFilledOutlineForColor(color1,p1,p2);
+					lastoutlinesForColor1=shapesBuilder.extendOutline(outlinesForColor1,p1,p2,lastoutlinesForColor1);
 				if(linestyle)
-					shapesBuilder.extendStrokeOutline(linestyle,p1,p2);
+					lastoutlinesForStroke=shapesBuilder.extendOutline(outlinesForStroke,p1,p2,lastoutlinesForStroke);
+				p1.x=p2.x;
+				p1.y=p2.y;
 			}
 			else
 			{
-				Vector2 p1(matrix.multiply2D(cursor));
 				cursor.x += cur->ControlDeltaX;
 				cursor.y += cur->ControlDeltaY;
 				Vector2 p2(matrix.multiply2D(cursor));
@@ -96,31 +107,45 @@ void TokenContainer::FromShaperecordListToShapeVector(const std::vector<SHAPEREC
 				Vector2 p3(matrix.multiply2D(cursor));
 
 				if(color0)
-					shapesBuilder.extendFilledOutlineForColorCurve(color0,p1,p2,p3);
+					lastoutlinesForColor0=shapesBuilder.extendOutlineCurve(outlinesForColor0,p1,p2,p3,lastoutlinesForColor0);
 				if(color1)
-					shapesBuilder.extendFilledOutlineForColorCurve(color1,p1,p2,p3);
+					lastoutlinesForColor1=shapesBuilder.extendOutlineCurve(outlinesForColor1,p1,p2,p3,lastoutlinesForColor1);
 				if(linestyle)
-					shapesBuilder.extendStrokeOutlineCurve(linestyle,p1,p2,p3);
+					lastoutlinesForStroke=shapesBuilder.extendOutlineCurve(outlinesForStroke,p1,p2,p3,lastoutlinesForStroke);
+				p1.x=p3.x;
+				p1.y=p3.y;
 			}
 		}
 		else
 		{
+			lastoutlinesForColor0=nullptr;
+			lastoutlinesForColor1=nullptr;
+			lastoutlinesForStroke=nullptr;
 			if(cur->StateMoveTo)
 			{
 				cursor.x= cur->MoveDeltaX-shapebounds.Xmin;
 				cursor.y= cur->MoveDeltaY-shapebounds.Ymin;
+				Vector2 tmp(matrix.multiply2D(cursor));
+				p1.x = tmp.x;
+				p1.y = tmp.y;
 			}
 			if(cur->StateLineStyle)
 			{
 				linestyle = cur->LineStyle;
+				if (linestyle)
+					outlinesForStroke=&shapesBuilder.strokeShapesMap[linestyle];
 			}
 			if(cur->StateFillStyle1)
 			{
 				color1=cur->FillStyle1;
+				if (color1)
+					outlinesForColor1=&shapesBuilder.filledShapesMap[color1];
 			}
 			if(cur->StateFillStyle0)
 			{
 				color0=cur->FillStyle0;
+				if (color0)
+					outlinesForColor0=&shapesBuilder.filledShapesMap[color0];
 			}
 		}
 	}
@@ -128,86 +153,122 @@ void TokenContainer::FromShaperecordListToShapeVector(const std::vector<SHAPEREC
 	shapesBuilder.outputTokens(fillStyles,lineStyles, tokens);
 }
 
-void TokenContainer::FromDefineMorphShapeTagToShapeVector(SystemState* sys,DefineMorphShapeTag *tag, tokensVector &tokens, uint16_t ratio)
+void TokenContainer::FromDefineMorphShapeTagToShapeVector(DefineMorphShapeTag *tag, tokensVector &tokens, uint16_t ratio)
 {
-	LOG(LOG_NOT_IMPLEMENTED,"MorphShape currently ignores most morph settings and just displays the start/end shape. ID:"<<tag->getId()<<" ratio:"<<ratio);
 	Vector2 cursor;
 	unsigned int color0=0;
 	unsigned int color1=0;
 	unsigned int linestyle=0;
+	vector< vector<ShapePathSegment> >* outlinesForColor0=nullptr;
+	vector<ShapePathSegment>* lastoutlinesForColor0=nullptr;
+	vector< vector<ShapePathSegment> >* outlinesForColor1=nullptr;
+	vector<ShapePathSegment>* lastoutlinesForColor1=nullptr;
+	vector< vector<ShapePathSegment> >* outlinesForStroke=nullptr;
+	vector<ShapePathSegment>* lastoutlinesForStroke=nullptr;
 
 	const MATRIX matrix;
 	ShapesBuilder shapesBuilder;
+	float curratiofactor = float(ratio)/65535.0;
 
-	// TODO compute SHAPERECORD entries based on ratio
-	auto it = ratio == 65535 ? tag->EndEdges.ShapeRecords.begin() : tag->StartEdges.ShapeRecords.begin();
-	auto last = ratio == 65535 ? tag->EndEdges.ShapeRecords.end() : tag->StartEdges.ShapeRecords.end();
-	while (it != last)
+	int boundsx = tag->StartBounds.Xmin + (float(tag->EndBounds.Xmin - tag->StartBounds.Xmin)*curratiofactor);
+	int boundsy = tag->StartBounds.Ymin + (float(tag->EndBounds.Ymin - tag->StartBounds.Ymin)*curratiofactor);
+	RECT boundsrc;
+	boundsrc.Xmin=boundsx;
+	boundsrc.Ymin=boundsy;
+	cursor.x= -boundsx;
+	cursor.y= -boundsy;
+	auto itstart = tag->StartEdges.ShapeRecords.begin();
+	auto itend = tag->StartEdges.ShapeRecords.size() > tag->EndEdges.ShapeRecords.size() ? tag->StartEdges.ShapeRecords.begin() : tag->EndEdges.ShapeRecords.begin();
+	Vector2 p1(matrix.multiply2D(cursor));
+	while (itstart != tag->StartEdges.ShapeRecords.end())
 	{
-		const SHAPERECORD* cur=&(*it);
-		it++;
-		if(cur->TypeFlag)
+		const SHAPERECORD* curstart=&(*itstart);
+		const SHAPERECORD* curend=&(*itend);
+		if(curstart->TypeFlag)
 		{
-			if(cur->StraightFlag)
+			if (outlinesForColor0 == outlinesForColor1)
 			{
-				Vector2 p1(matrix.multiply2D(cursor));
-				cursor.x += cur->DeltaX;
-				cursor.y += cur->DeltaY;
+				lastoutlinesForColor0=nullptr;
+				lastoutlinesForColor1=nullptr;
+			}
+			if(curstart->StraightFlag)
+			{
+				cursor.x += curstart->DeltaX+(curend->DeltaX-curstart->DeltaX)*curratiofactor;
+				cursor.y += curstart->DeltaY+(curend->DeltaY-curstart->DeltaY)*curratiofactor;
 				Vector2 p2(matrix.multiply2D(cursor));
 
 				if(color0)
-					shapesBuilder.extendFilledOutlineForColor(color0,p1,p2);
+					lastoutlinesForColor0=shapesBuilder.extendOutline(outlinesForColor0,p1,p2,lastoutlinesForColor0);
 				if(color1)
-					shapesBuilder.extendFilledOutlineForColor(color1,p1,p2);
+					lastoutlinesForColor1=shapesBuilder.extendOutline(outlinesForColor1,p1,p2,lastoutlinesForColor1);
 				if(linestyle)
-					shapesBuilder.extendStrokeOutline(linestyle,p1,p2);
+					lastoutlinesForStroke=shapesBuilder.extendOutline(outlinesForStroke,p1,p2,lastoutlinesForStroke);
+				p1.x=p2.x;
+				p1.y=p2.y;
 			}
 			else
 			{
-				Vector2 p1(matrix.multiply2D(cursor));
-				cursor.x += cur->ControlDeltaX;
-				cursor.y += cur->ControlDeltaY;
+				cursor.x += curstart->ControlDeltaX+(curend->ControlDeltaX-curstart->ControlDeltaX)*curratiofactor;
+				cursor.y += curstart->ControlDeltaY+(curend->ControlDeltaY-curstart->ControlDeltaY)*curratiofactor;
 				Vector2 p2(matrix.multiply2D(cursor));
-				cursor.x += cur->AnchorDeltaX;
-				cursor.y += cur->AnchorDeltaY;
+				cursor.x += curstart->AnchorDeltaX+(curend->AnchorDeltaX-curstart->AnchorDeltaX)*curratiofactor;
+				cursor.y += curstart->AnchorDeltaY+(curend->AnchorDeltaY-curstart->AnchorDeltaY)*curratiofactor;
 				Vector2 p3(matrix.multiply2D(cursor));
 
 				if(color0)
-					shapesBuilder.extendFilledOutlineForColorCurve(color0,p1,p2,p3);
+					lastoutlinesForColor0=shapesBuilder.extendOutlineCurve(outlinesForColor0,p1,p2,p3,lastoutlinesForColor0);
 				if(color1)
-					shapesBuilder.extendFilledOutlineForColorCurve(color1,p1,p2,p3);
+					lastoutlinesForColor1=shapesBuilder.extendOutlineCurve(outlinesForColor1,p1,p2,p3,lastoutlinesForColor1);
 				if(linestyle)
-					shapesBuilder.extendStrokeOutlineCurve(linestyle,p1,p2,p3);
+					lastoutlinesForStroke=shapesBuilder.extendOutlineCurve(outlinesForStroke,p1,p2,p3,lastoutlinesForStroke);
+				p1.x=p3.x;
+				p1.y=p3.y;
 			}
 		}
 		else
 		{
-			if(cur->StateMoveTo)
+			lastoutlinesForColor0=nullptr;
+			lastoutlinesForColor1=nullptr;
+			lastoutlinesForStroke=nullptr;
+			if(curstart->StateMoveTo)
 			{
-				cursor.x=cur->MoveDeltaX;
-				cursor.y=cur->MoveDeltaY;
+				cursor.x=(curstart->MoveDeltaX-boundsx)+(curend->MoveDeltaX-curstart->MoveDeltaX)*curratiofactor;
+				cursor.y=(curstart->MoveDeltaY-boundsy)+(curend->MoveDeltaY-curstart->MoveDeltaY)*curratiofactor;
+				Vector2 tmp(matrix.multiply2D(cursor));
+				p1.x = tmp.x;
+				p1.y = tmp.y;
 			}
-			if(cur->StateLineStyle)
+			if(curstart->StateLineStyle)
 			{
-				linestyle = cur->LineStyle;
+				linestyle = curstart->LineStyle;
+				if (linestyle)
+					outlinesForStroke=&shapesBuilder.strokeShapesMap[linestyle];
 			}
-			if(cur->StateFillStyle1)
+			if(curstart->StateFillStyle1)
 			{
-				color1=cur->FillStyle1;
+				color1=curstart->StateFillStyle1;
+				if (color1)
+					outlinesForColor1=&shapesBuilder.filledShapesMap[color1];
 			}
-			if(cur->StateFillStyle0)
+			if(curstart->StateFillStyle0)
 			{
-				color0=cur->FillStyle0;
+				color0=curstart->StateFillStyle0;
+				if (color0)
+					outlinesForColor0=&shapesBuilder.filledShapesMap[color0];
 			}
 		}
+		itstart++;
+		itend++;
 	}
 	tokens.clear();
-	shapesBuilder.outputMorphTokens(tag->MorphFillStyles.FillStyles,tag->MorphLineStyles.LineStyles2, tokens,ratio);
+	shapesBuilder.outputMorphTokens(tag->MorphFillStyles.FillStyles,tag->MorphLineStyles.LineStyles2, tokens,ratio,boundsrc);
 }
 
 void TokenContainer::requestInvalidation(InvalidateQueue* q, bool forceTextureRefresh)
 {
-	if(tokens.empty() || owner->skipRender())
+	if((tokens.empty() && !owner->computeCacheAsBitmap()) || owner->skipRender())
+		return;
+	if (owner->requestInvalidationForCacheAsBitmap(q))
 		return;
 	owner->incRef();
 	if (forceTextureRefresh)
@@ -215,11 +276,15 @@ void TokenContainer::requestInvalidation(InvalidateQueue* q, bool forceTextureRe
 	q->addToInvalidateQueue(_MR(owner));
 }
 
-IDrawable* TokenContainer::invalidate(DisplayObject* target, const MATRIX& initialMatrix,bool smoothing)
+IDrawable* TokenContainer::invalidate(DisplayObject* target, const MATRIX& initialMatrix, bool smoothing, InvalidateQueue* q, _NR<DisplayObject>* cachedBitmap, bool fromgraphics)
 {
-	int32_t x,y,rx,ry;
-	uint32_t width,height;
-	uint32_t rwidth,rheight;
+	if (owner->computeCacheAsBitmap() && (!q || !q->getCacheAsBitmapObject() || q->getCacheAsBitmapObject().getPtr()!=owner))
+	{
+		return owner->getCachedBitmapDrawable(target, initialMatrix, cachedBitmap);
+	}
+	number_t x,y,rx,ry;
+	number_t width,height;
+	number_t rwidth,rheight;
 	number_t bxmin,bxmax,bymin,bymax;
 	if(!owner->boundsRectWithoutChildren(bxmin,bxmax,bymin,bymax))
 	{
@@ -235,11 +300,11 @@ IDrawable* TokenContainer::invalidate(DisplayObject* target, const MATRIX& initi
 	int offx,offy;
 	owner->getSystemState()->stageCoordinateMapping(owner->getSystemState()->getRenderThread()->windowWidth,owner->getSystemState()->getRenderThread()->windowHeight,offx,offy, scalex,scaley);
 
-	bool isMask;
-	bool hasMask;
+	bool isMask=false;
+	_NR<DisplayObject> mask;
 	if (target)
 	{
-		owner->computeMasksAndMatrix(target,masks,totalMatrix,false,isMask,hasMask);
+		owner->computeMasksAndMatrix(target,masks,totalMatrix,false,isMask,mask);
 		totalMatrix=initialMatrix.multiplyMatrix(totalMatrix);
 	}
 	owner->computeBoundsForTransformedRect(bxmin,bxmax,bymin,bymax,x,y,width,height,totalMatrix);
@@ -261,7 +326,9 @@ IDrawable* TokenContainer::invalidate(DisplayObject* target, const MATRIX& initi
 	std::vector<IDrawable::MaskData> masks2;
 	if (target)
 	{
-		owner->computeMasksAndMatrix(target,masks2,totalMatrix2,true,isMask,hasMask);
+		if (q && q->isSoftwareQueue)
+			totalMatrix2.translate(bxmin,bymin);
+		owner->computeMasksAndMatrix(target,masks2,totalMatrix2,true,isMask,mask);
 		totalMatrix2=initialMatrix.multiplyMatrix(totalMatrix2);
 	}
 	owner->computeBoundsForTransformedRect(bxmin,bxmax,bymin,bymax,rx,ry,rwidth,rheight,totalMatrix2);
@@ -285,28 +352,41 @@ IDrawable* TokenContainer::invalidate(DisplayObject* target, const MATRIX& initi
 		blueOffset=ct->blueOffset;
 		alphaOffset=ct->alphaOffset;
 	}
-	return new CairoTokenRenderer(tokens,totalMatrix
-				, x*scalex, y*scaley, width*scalex, height*scaley
-				, rx*scalex,ry*scaley,rwidth*scalex,rheight*scaley,rotation
+	number_t regpointx = 0.0;
+	number_t regpointy = 0.0;
+	if (fromgraphics)
+	{
+		// the tokens are generated from graphics, so we have to translate them to the registration point of the sprite/shape
+		regpointx=bxmin;
+		regpointy=bymin;
+	}
+	owner->cachedSurface.isValid=true;
+	return new CairoTokenRenderer(tokens,totalMatrix2
+				, x*scalex, y*scaley, ceil(width*scalex), ceil(height*scaley)
+				, rx*scalex, ry*scaley, ceil(rwidth*scalex), ceil(rheight*scaley), rotation
 				, xscale, yscale
-				, isMask, hasMask
+				, isMask, mask
 				, scaling,owner->getConcatenatedAlpha(), masks
 				, redMultiplier,greenMultiplier,blueMultiplier,alphaMultiplier
 				, redOffset,greenOffset,blueOffset,alphaOffset
-				, smoothing
-				,bxmin*scaling,bymin*scaling);
+				, smoothing, regpointx, regpointy);
 }
 
 _NR<DisplayObject> TokenContainer::hitTestImpl(_NR<DisplayObject> last, number_t x, number_t y, DisplayObject::HIT_TYPE type) const
 {
 	//Masks have been already checked along the way
 
+	owner->startDrawJob(); // ensure that tokens are not changed during hitTest
 	if(CairoTokenRenderer::hitTest(tokens, scaling, x, y))
+	{
+		owner->endDrawJob();
 		return last;
+	}
+	owner->endDrawJob();
 	return NullRef;
 }
 
-bool TokenContainer::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const
+bool TokenContainer::boundsRectFromTokens(const tokensVector& tokens,float scaling, number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax)
 {
 
 	#define VECTOR_BOUNDS(v) \
@@ -326,18 +406,22 @@ bool TokenContainer::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, 
 	bool hasContent = false;
 	double strokeWidth = 0;
 
-	for(unsigned int i=0;i<tokens.filltokens.size();i++)
+	auto it = tokens.filltokens.begin();
+	while(it != tokens.filltokens.end())
 	{
-		switch(tokens.filltokens[i]->type)
+		GeomToken p(*it,false);
+		switch(p.type)
 		{
 			case CURVE_CUBIC:
 			{
-				VECTOR_BOUNDS(tokens.filltokens[i]->p3);
+				GeomToken p1(*(++it),false);
+				VECTOR_BOUNDS(p1.vec);
 			}
 			// falls through
 			case CURVE_QUADRATIC:
 			{
-				VECTOR_BOUNDS(tokens.filltokens[i]->p2);
+				GeomToken p1(*(++it),false);
+				VECTOR_BOUNDS(p1.vec);
 			}
 			// falls through
 			case STRAIGHT:
@@ -347,32 +431,45 @@ bool TokenContainer::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, 
 			// falls through
 			case MOVE:
 			{
-				VECTOR_BOUNDS(tokens.filltokens[i]->p1);
+				GeomToken p1(*(++it),false);
+				VECTOR_BOUNDS(p1.vec);
 				break;
 			}
 			case CLEAR_FILL:
 			case CLEAR_STROKE:
-			case SET_FILL:
 			case FILL_KEEP_SOURCE:
-			case FILL_TRANSFORM_TEXTURE:
 				break;
 			case SET_STROKE:
-				strokeWidth = (double)(tokens.filltokens[i]->lineStyle.Width / 20.0);
+			{
+				GeomToken p1(*(++it),false);
+				strokeWidth = (double)(p1.lineStyle->Width / 20.0);
+				break;
+			}
+			case SET_FILL:
+				it++;
+				break;
+			case FILL_TRANSFORM_TEXTURE:
+				it+=6;
 				break;
 		}
+		it++;
 	}
-	for(unsigned int i=0;i<tokens.stroketokens.size();i++)
+	auto it2 = tokens.stroketokens.begin();
+	while(it2 != tokens.stroketokens.end())
 	{
-		switch(tokens.stroketokens[i]->type)
+		GeomToken p(*it2,false);
+		switch(p.type)
 		{
 			case CURVE_CUBIC:
 			{
-				VECTOR_BOUNDS(tokens.stroketokens[i]->p3);
+				GeomToken p1(*(++it2),false);
+				VECTOR_BOUNDS(p1.vec);
 			}
 			// falls through
 			case CURVE_QUADRATIC:
 			{
-				VECTOR_BOUNDS(tokens.stroketokens[i]->p2);
+				GeomToken p1(*(++it2),false);
+				VECTOR_BOUNDS(p1.vec);
 			}
 			// falls through
 			case STRAIGHT:
@@ -382,19 +479,28 @@ bool TokenContainer::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, 
 			// falls through
 			case MOVE:
 			{
-				VECTOR_BOUNDS(tokens.stroketokens[i]->p1);
+				GeomToken p1(*(++it2),false);
+				VECTOR_BOUNDS(p1.vec);
 				break;
 			}
 			case CLEAR_FILL:
 			case CLEAR_STROKE:
-			case SET_FILL:
 			case FILL_KEEP_SOURCE:
-			case FILL_TRANSFORM_TEXTURE:
 				break;
 			case SET_STROKE:
-				strokeWidth = (double)(tokens.stroketokens[i]->lineStyle.Width / 20.0);
+			{
+				GeomToken p1(*(++it2),false);
+				strokeWidth = (double)(p1.lineStyle->Width / 20.0);
+				break;
+			}
+			case SET_FILL:
+				it2++;
+				break;
+			case FILL_TRANSFORM_TEXTURE:
+				it2+=6;
 				break;
 		}
+		it2++;
 	}
 	if(hasContent)
 	{
@@ -416,41 +522,96 @@ bool TokenContainer::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, 
 }
 
 /* Find the size of the active texture (bitmap set by the latest SET_FILL). */
-void TokenContainer::getTextureSize(std::vector<_NR<GeomToken>, reporter_allocator<_NR<GeomToken>>>& tokens, int *width, int *height)
+void TokenContainer::getTextureSize(std::vector<uint64_t>& tokens, int *width, int *height)
 {
 	*width=0;
 	*height=0;
 
-	for(int i=tokens.size()-1;i>=0;i--)
+	uint32_t lastindex=UINT32_MAX;
+	for(uint32_t i=0;i<tokens.size();i++)
 	{
-		const FILLSTYLE& style=tokens[i]->fillStyle;
-		const FILL_STYLE_TYPE& fstype=style.FillStyleType;
-		if(tokens[i]->type==SET_FILL && 
-		   (fstype==REPEATING_BITMAP ||
-		    fstype==NON_SMOOTHED_REPEATING_BITMAP ||
-		    fstype==CLIPPED_BITMAP ||
-		    fstype==NON_SMOOTHED_CLIPPED_BITMAP))
+		switch (GeomToken(tokens[i],false).type)
 		{
-			if (style.bitmap.isNull())
-				return;
-
-			*width=style.bitmap->getWidth();
-			*height=style.bitmap->getHeight();
-			return;
+			case SET_STROKE:
+			case STRAIGHT:
+			case MOVE:
+				i++;
+				break;
+			case CURVE_QUADRATIC:
+				i+=2;
+				break;
+			case CLEAR_FILL:
+			case CLEAR_STROKE:
+			case FILL_KEEP_SOURCE:
+				break;
+			case CURVE_CUBIC:
+				i+=3;
+				break;
+			case FILL_TRANSFORM_TEXTURE:
+				i+=6;
+				break;
+			case SET_FILL:
+			{
+				i++;
+				const FILLSTYLE* style=GeomToken(tokens[i],false).fillStyle;
+				const FILL_STYLE_TYPE& fstype=style->FillStyleType;
+				if(fstype==REPEATING_BITMAP ||
+					fstype==NON_SMOOTHED_REPEATING_BITMAP ||
+					fstype==CLIPPED_BITMAP ||
+					fstype==NON_SMOOTHED_CLIPPED_BITMAP)
+				{
+					lastindex=i;
+				}
+				break;
+			}
 		}
+	}
+	if (lastindex != UINT32_MAX)
+	{
+		const FILLSTYLE* style=GeomToken(tokens[lastindex],false).fillStyle;
+		if (style->bitmap.isNull())
+			return;
+		*width=style->bitmap->getWidth();
+		*height=style->bitmap->getHeight();
 	}
 }
 
 /* Return the width of the latest SET_STROKE */
 uint16_t TokenContainer::getCurrentLineWidth() const
 {
-	for(int i=tokens.stroketokens.size()-1;i>=0;i--)
+	uint32_t lastindex=UINT32_MAX;
+	for(uint32_t i=0;i<tokens.stroketokens.size();i++)
 	{
-		if(tokens.stroketokens[i]->type==SET_STROKE)
+		switch (GeomToken(tokens.stroketokens[i],false).type)
 		{
-			return tokens.stroketokens[i]->lineStyle.Width;
+			case SET_FILL:
+			case STRAIGHT:
+			case MOVE:
+				i++;
+				break;
+			case CURVE_QUADRATIC:
+				i+=2;
+				break;
+			case CLEAR_FILL:
+			case CLEAR_STROKE:
+			case FILL_KEEP_SOURCE:
+				break;
+			case CURVE_CUBIC:
+				i+=3;
+				break;
+			case FILL_TRANSFORM_TEXTURE:
+				i+=6;
+				break;
+			case SET_STROKE:
+			{
+				i++;
+				lastindex=i;
+				break;
+			}
 		}
 	}
-
+	if (lastindex != UINT32_MAX)
+		return GeomToken(tokens.stroketokens[lastindex],false).lineStyle->Width;
+	
 	return 0;
 }

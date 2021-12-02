@@ -180,6 +180,16 @@ void SymbolClassTag::execute(RootMovieClip* root) const
 			root->hasMainClass=true;
 			root->incRef();
 			getVm(root->getSystemState())->addEvent(NullRef, _MR(new (root->getSystemState()->unaccountedMemory) BindClassEvent(_MR(root),className)));
+			if (root != root->getSystemState()->mainClip)
+			{
+				ASWorker* worker = getWorker();
+				if (worker)
+				{
+					worker->state ="running";
+					worker->incRef();
+					getVm(root->getSystemState())->addEvent(_MR(worker),_MR(Class<Event>::getInstanceS(root->getSystemState(),"workerState")));
+				}
+			}
 		}
 		else
 		{
@@ -203,7 +213,7 @@ void ScriptLimitsTag::execute(RootMovieClip* root) const
 
 void ABCVm::registerClasses()
 {
-	Global* builtin=Class<Global>::getInstanceS(m_sys,(ABCContext*)nullptr, 0);
+	Global* builtin=Class<Global>::getInstanceS(m_sys,(ABCContext*)nullptr, 0,false);
 	builtin->setRefConstant();
 	//Register predefined types, ASObject are enough for not implemented classes
 	registerClassesToplevel(builtin);
@@ -320,9 +330,9 @@ multiname* ABCContext::s_getMultiname_d(call_context* th, number_t rtd, int n)
 	multiname* ret;
 
 	multiname_info* m=&th->mi->context->constant_pool.multinames[n];
-	if(m->cached==NULL)
+	if(m->cached==nullptr)
 	{
-		m->cached=new (getVm(th->mi->context->root->getSystemState())->vmDataMemory) multiname(getVm(th->mi->context->root->getSystemState())->vmDataMemory);
+		m->cached=new (getVm(th->sys)->vmDataMemory) multiname(getVm(th->sys)->vmDataMemory);
 		ret=m->cached;
 		ret->isAttribute=m->isAttributeName();
 		switch(m->kind)
@@ -374,7 +384,7 @@ multiname* ABCContext::s_getMultiname_i(call_context* th, uint32_t rti, int n)
 	multiname_info* m=&th->mi->context->constant_pool.multinames[n];
 	if(m->cached==NULL)
 	{
-		m->cached=new (getVm(th->mi->context->root->getSystemState())->vmDataMemory) multiname(getVm(th->mi->context->root->getSystemState())->vmDataMemory);
+		m->cached=new (getVm(th->sys)->vmDataMemory) multiname(getVm(th->sys)->vmDataMemory);
 		ret=m->cached;
 		ret->isAttribute=m->isAttributeName();
 		switch(m->kind)
@@ -645,7 +655,7 @@ multiname* ABCContext::getMultinameImpl(asAtom& n, ASObject* n2, unsigned int mi
 			//QName is used even in MultinameL
 			if (asAtomHandler::isInteger(n))
 			{
-				ret->name_i=asAtomHandler::getInt(n);
+				ret->name_i=asAtomHandler::toInt(n);
 				ret->name_type = multiname::NAME_INT;
 				ret->name_s_id = UINT32_MAX;
 				ret->isInteger=true;
@@ -1032,10 +1042,11 @@ void ABCVm::publicHandleEvent(EventDispatcher* dispatcher, _R<Event> event)
 			event->incRef();
 			_R<MouseEvent> mevent = _MR(event->as<MouseEvent>());
 			if(mevent->relatedObject)
-			{  
+			{
 				mevent->relatedObject->incRef();
 				rcur = mevent->relatedObject.getPtr();
 			}
+			dispatcher->as<DisplayObject>()->handleMouseCursor(event->type == "rollOver");
 		}
 		//If the relObj is non null, we get its ancestors to build a truncated parents queue for the target 
 		if(rcur)
@@ -1137,7 +1148,10 @@ void ABCVm::publicHandleEvent(EventDispatcher* dispatcher, _R<Event> event)
 		dispatcher->incRef();
 		dispatcher->getSystemState()->stage->setFocusTarget(_MR(dispatcher->as<InteractiveObject>()));
 	}
-	dispatcher->getSystemState()->stage->AVM1HandleEvent(dispatcher,event.getPtr());
+	if (dispatcher->is<DisplayObject>())
+		dispatcher->getSystemState()->stage->AVM1HandleEvent(dispatcher,event.getPtr());
+	else
+		dispatcher->AVM1HandleEvent(dispatcher,event.getPtr());
 	
 	/* This must even be called if stop*Propagation has been called */
 	if(!event->defaultPrevented)
@@ -1291,6 +1305,9 @@ void ABCVm::handleEvent(std::pair<_NR<EventDispatcher>, _R<Event> > e)
 			case IDLE_EVENT:
 			{
 				Locker l(event_queue_mutex);
+				// DisplayObjects that are removed from the display list keep their Parent set until all removedFromStage events are handled
+				// see http://www.senocular.com/flash/tutorials/orderofoperations/#ObjectDestruction
+				m_sys->resetParentList();
 				while (!idleevents_queue.empty())
 				{
 					events_queue.push_back(idleevents_queue.front());
@@ -1405,6 +1422,10 @@ bool ABCVm::addEvent(_NR<EventDispatcher> obj ,_R<Event> ev)
 	events_queue.push_back(pair<_NR<EventDispatcher>,_R<Event>>(obj, ev));
 	RELEASE_WRITE(ev->queued,true);
 	sem_event_cond.signal();
+	if (!m_sys->singleworker)
+	{
+		m_sys->addEventToBackgroundWorkers(obj,ev);
+	}
 	return true;
 }
 void ABCVm::addIdleEvent(_NR<EventDispatcher> obj ,_R<Event> ev)
@@ -1422,11 +1443,11 @@ Class_inherit* ABCVm::findClassInherit(const string& s, RootMovieClip* root)
 	LOG(LOG_CALLS,_("Setting class name to ") << s);
 	ASObject* target;
 	ASObject* derived_class=root->applicationDomain->getVariableByString(s,target);
-	if(derived_class==NULL)
+	if(derived_class==nullptr)
 	{
 		//LOG(LOG_ERROR,_("Class ") << s << _(" not found in global for ")<<root->getOrigin());
 		//throw RunTimeException("Class not found in global");
-		return NULL;
+		return nullptr;
 	}
 
 	assert_and_throw(derived_class->getObjectType()==T_CLASS);
@@ -1437,7 +1458,7 @@ Class_inherit* ABCVm::findClassInherit(const string& s, RootMovieClip* root)
 	if(derived_class_tmp->isBinded())
 	{
 		//LOG(LOG_ERROR, "Class already binded to a tag. Not binding:"<<s<< " class:"<<derived_class_tmp->getQualifiedClassName());
-		return NULL;
+		return nullptr;
 	}
 	return derived_class_tmp;
 }
@@ -1459,17 +1480,17 @@ void ABCVm::buildClassAndInjectBase(const string& s, _R<RootMovieClip> base)
 	base->setConstructorCallComplete();
 }
 
-bool ABCVm::buildClassAndBindTag(const string& s, DictionaryTag* t)
+bool ABCVm::buildClassAndBindTag(const string& s, DictionaryTag* t, Class_inherit* derived_cls)
 {
-	Class_inherit* derived_class_tmp = findClassInherit(s, t->loadedFrom);
+	Class_inherit* derived_class_tmp = derived_cls? derived_cls : findClassInherit(s, t->loadedFrom);
 	if(!derived_class_tmp)
 		return false;
-
+	derived_class_tmp->checkScriptInit();
 	//It seems to be acceptable for the same base to be binded multiple times.
 	//In such cases the first binding is bidirectional (instances created using PlaceObject
 	//use the binded class and instances created using 'new' use the binded tag). Any other
 	//bindings will be unidirectional (only instances created using new will use the binded tag)
-	if(t->bindedTo==NULL)
+	if(t->bindedTo==nullptr)
 		t->bindedTo=derived_class_tmp;
 
 	derived_class_tmp->bindToTag(t);
@@ -1512,7 +1533,7 @@ void ABCVm::handleFrontEvent()
 	}
 	catch(LightsparkException& e)
 	{
-		LOG(LOG_ERROR,_("Error in VM ") << e.cause);
+		LOG(LOG_ERROR,"Error in VM " << e.cause);
 		m_sys->setError(e.cause);
 		/* do not allow any more event to be enqueued */
 		signalEventWaiters();
@@ -1520,18 +1541,18 @@ void ABCVm::handleFrontEvent()
 	catch(ASObject*& e)
 	{
 		if(e->getClass())
-			LOG(LOG_ERROR,_("Unhandled ActionScript exception in VM ") << e->toString());
+			LOG(LOG_ERROR,"Unhandled ActionScript exception in VM " << e->toString());
 		else
-			LOG(LOG_ERROR,_("Unhandled ActionScript exception in VM (no type)"));
+			LOG(LOG_ERROR,"Unhandled ActionScript exception in VM (no type)");
 		if (e->is<ASError>())
 		{
-			LOG(LOG_ERROR,_("Unhandled ActionScript exception in VM ") << e->as<ASError>()->getStackTraceString());
+			LOG(LOG_ERROR,"Unhandled ActionScript exception in VM " << e->as<ASError>()->getStackTraceString());
 			if (m_sys->ignoreUnhandledExceptions)
 				return;
 			m_sys->setError(e->as<ASError>()->getStackTraceString());
 		}
 		else
-			m_sys->setError(_("Unhandled ActionScript exception"));
+			m_sys->setError("Unhandled ActionScript exception");
 		/* do not allow any more event to be enqueued */
 		shuttingdown = true;
 		signalEventWaiters();
@@ -1551,7 +1572,7 @@ method_info* ABCContext::get_method(unsigned int m)
 
 void ABCVm::not_impl(int n)
 {
-	LOG(LOG_NOT_IMPLEMENTED, _("not implement opcode 0x") << hex << n );
+	LOG(LOG_NOT_IMPLEMENTED, "not implement opcode 0x" << hex << n );
 	throw UnsupportedException("Not implemented opcode");
 }
 
@@ -1616,7 +1637,7 @@ void ABCContext::declareScripts()
 		LOG(LOG_CALLS, _("Script N: ") << i );
 
 		//Creating a new global for this script
-		Global* global=Class<Global>::getInstanceS(root->getSystemState(),this, i);
+		Global* global=Class<Global>::getInstanceS(root->getSystemState(),this, i,false);
 		global->setRefConstant();
 #ifndef NDEBUG
 		global->initialized=false;
@@ -1651,8 +1672,6 @@ void ABCContext::exec(bool lazy)
 	LOG(LOG_CALLS, _("Last script (Entry Point)"));
 	//Creating a new global for the last script
 	Global* global=root->applicationDomain->getLastGlobalScope();
-	root->getSystemState()->worker->state ="running";
-	getVm(root->getSystemState())->addEvent(_MR(root->getSystemState()->worker),_MR(Class<Event>::getInstanceS(root->getSystemState(),"workerState")));
 
 	//the script init of the last script is the main entry point
 	if(!lazy)
@@ -1673,12 +1692,13 @@ void ABCContext::runScriptInit(unsigned int i, asAtom &g)
 
 	method_info* m=get_method(scripts[i].init);
 	SyntheticFunction* entry=Class<IFunction>::getSyntheticFunction(this->root->getSystemState(),m,m->numArgs());
+	entry->fromNewFunction=true;
 	
 	entry->addToScope(scope_entry(g,false));
 
 	asAtom ret=asAtomHandler::invalidAtom;
 	asAtom f =asAtomHandler::fromObject(entry);
-	asAtomHandler::callFunction(f,ret,g,NULL,0,false);
+	asAtomHandler::callFunction(f,ret,g,nullptr,0,false);
 
 	ASATOM_DECREF(ret);
 
@@ -2030,7 +2050,7 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 				throw ParseException("Interface trait has to be a NULL body");
 
 			variable* var=NULL;
-			var = c->borrowedVariables.findObjVar(nameId,nsNameAndKind(c->getSystemState(),"",NAMESPACE),NO_CREATE_TRAIT,DECLARED_TRAIT);
+			var = c->borrowedVariables.findObjVar(nameId,nsNameAndKind(),NO_CREATE_TRAIT,DECLARED_TRAIT);
 			if(var && asAtomHandler::isValid(var->var))
 			{
 				assert_and_throw(asAtomHandler::isFunction(var->var));
@@ -2054,7 +2074,7 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 				throw ParseException("Interface trait has to be a NULL body");
 
 			variable* var=NULL;
-			var=c->borrowedVariables.findObjVar(nameId,nsNameAndKind(c->getSystemState(),"",NAMESPACE),NO_CREATE_TRAIT,DECLARED_TRAIT);
+			var=c->borrowedVariables.findObjVar(nameId,nsNameAndKind(),NO_CREATE_TRAIT,DECLARED_TRAIT);
 			if(var && asAtomHandler::isValid(var->getter))
 			{
 				ASATOM_INCREF(var->getter);
@@ -2076,7 +2096,7 @@ void ABCContext::linkTrait(Class_base* c, const traits_info* t)
 				throw ParseException("Interface trait has to be a NULL body");
 
 			variable* var=NULL;
-			var=c->borrowedVariables.findObjVar(nameId,nsNameAndKind(c->getSystemState(),"",NAMESPACE),NO_CREATE_TRAIT,DECLARED_TRAIT);
+			var=c->borrowedVariables.findObjVar(nameId,nsNameAndKind(),NO_CREATE_TRAIT,DECLARED_TRAIT);
 			if(var && asAtomHandler::isValid(var->setter))
 			{
 				ASATOM_INCREF(var->setter);
@@ -2200,7 +2220,7 @@ uint32_t ABCContext::addCachedConstantAtom(asAtom a)
 
 void ABCContext::buildTrait(ASObject* obj,std::vector<multiname*>& additionalslots, const traits_info* t, bool isBorrowed, int scriptid, bool checkExisting)
 {
-	multiname* mname=getMultiname(t->name,NULL);
+	multiname* mname=getMultiname(t->name,nullptr);
 	//Should be a Qname
 	assert_and_throw(mname->name_type==multiname::NAME_STRING);
 #ifndef NDEBUG
@@ -2347,6 +2367,7 @@ void ABCContext::buildTrait(ASObject* obj,std::vector<multiname*>& additionalslo
 				root->applicationDomain->classesBeingDefined.insert(make_pair(mname, c));
 				ret=c;
 				c->setIsInitialized();
+				assert(mname->isStatic);
 			}
 			// the variable on the Definition object is set to null now (it will be set to the real value after the class init function was executed in newclass opcode)
 			// testing for class==null in actionscript code is used to determine if the class initializer function has been called
@@ -2469,13 +2490,13 @@ void method_info::getOptional(asAtom& ret, unsigned int i)
 	context->getConstant(ret,info.options[i].kind,info.options[i].val);
 }
 
-const multiname* method_info::paramTypeName(unsigned int i) const
+multiname* method_info::paramTypeName(unsigned int i) const
 {
 	assert_and_throw(i<info.param_type.size());
 	return context->getMultiname(info.param_type[i],NULL);
 }
 
-const multiname* method_info::returnTypeName() const
+multiname* method_info::returnTypeName() const
 {
 	return context->getMultiname(info.return_type,NULL);
 }

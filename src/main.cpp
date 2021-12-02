@@ -87,7 +87,7 @@ public:
 	{
 		removedir(Config::getConfig()->getDataDirectory().c_str());
 	}
-	SDL_Window* createWidget(uint32_t w, uint32_t h)
+	SDL_Window* createWidget(uint32_t w, uint32_t h) override
 	{
 		SDL_Window* window = SDL_CreateWindow("Lightspark",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,w,h,SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 		if (window == 0)
@@ -99,7 +99,7 @@ public:
 		}
 		return window;
 	}
-	
+
 	uint32_t getWindowForGnash() override
 	{
 		/* passing and invalid window id to gnash makes
@@ -487,7 +487,11 @@ int main(int argc, char* argv[])
 
 	// create path for shared object local storage
 	char absolutepath[PATH_MAX];
-	realpath(fileName,absolutepath);
+	if (realpath(fileName,absolutepath) == nullptr)
+	{
+		LOG(LOG_ERROR, "Unable to resolve file");
+		exit(1);
+	}
 	tiny_string homedir(g_get_home_dir());
 	tiny_string filedatapath = absolutepath;
 	if (filedatapath.find(homedir) == 0) // remove home dir, if file is located below home dir

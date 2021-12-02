@@ -214,6 +214,7 @@ ASFUNCTIONBODY_ATOM(avmplusSystem,sleep)
 ASFUNCTIONBODY_ATOM(avmplusSystem,exit)
 {
 	LOG(LOG_NOT_IMPLEMENTED, _("avmplus.System.exit is unimplemented."));
+	ret = asAtomHandler::undefinedAtom;
 }
 ASFUNCTIONBODY_ATOM(avmplusSystem,canonicalizeNumber)
 {
@@ -348,15 +349,18 @@ ASFUNCTIONBODY_ATOM(avmplusDomain,_setDomainMemory)
 	_NR<ByteArray> b;
 	ARG_UNPACK_ATOM(b);
 	avmplusDomain* th = asAtomHandler::as<avmplusDomain>(obj);
+	
 	if (b.isNull())
 	{
 		th->appdomain->domainMemory = b;
+		th->appdomain->checkDomainMemory();
 		return;
 	}
 		
 	if (b->getLength() < MIN_DOMAIN_MEMORY_LIMIT)
 		throwError<RangeError>(kEndOfFileError);
 	th->appdomain->domainMemory = b;
+	th->appdomain->checkDomainMemory();
 }
 
 ASFUNCTIONBODY_ATOM(lightspark,casi32)

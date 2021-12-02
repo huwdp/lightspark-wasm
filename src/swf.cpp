@@ -38,6 +38,7 @@
 #include "backends/extscriptobject.h"
 #include "backends/input.h"
 #include "backends/locale.h"
+#include "backends/currency.h"
 #include "memory_support.h"
 
 #ifdef ENABLE_CURL
@@ -190,7 +191,14 @@ void SystemState::staticInit()
 #endif
 
 	// seed the random number generator
-	srand(time(NULL));
+	char *envvar = getenv("LIGHTSPARK_RANDOM_SEED");
+	if (envvar)
+	{
+		LOG(LOG_INFO,"using static random seed:"<<envvar);
+		srand(atoi(envvar));
+	}
+	else
+		srand(time(nullptr));
 }
 
 void SystemState::staticDeinit()
@@ -207,7 +215,8 @@ static const char* builtinStrings[] = {"any", "void", "prototype", "Function", "
 									   "_target","this","_root","_parent","_global","super",
 									   "onEnterFrame","onMouseMove","onMouseDown","onMouseUp","onPress","onRelease","onReleaseOutside","onMouseWheel","onLoad",
 									   "object","undefined","boolean","number","string","function","onRollOver","onRollOut",
-									   "__proto__"
+									   "__proto__","target","flash.events:IEventDispatcher","addEventListener","removeEventListener","dispatchEvent","hasEventListener",
+									   "onConnect","onData","onClose"
 									  };
 
 extern uint32_t asClassCount;
@@ -313,6 +322,7 @@ SystemState::SystemState(uint32_t fileSize, FLASH_MODE mode):
 	intervalManager=new IntervalManager();
 	securityManager=new SecurityManager();
 	localeManager = new LocaleManager();
+    currencyManager = new CurrencyManager();
 
 	_NR<LoaderInfo> loaderInfo=_MR(Class<LoaderInfo>::getInstanceS(this));
 	loaderInfo->applicationDomain = applicationDomain;
@@ -517,6 +527,8 @@ void SystemState::stopEngines()
 	securityManager=nullptr;
 	delete localeManager;
 	localeManager=nullptr;
+    delete currencyManager;
+    currencyManager=NULL;
 	delete threadPool;
 	threadPool=nullptr;
 	delete downloadThreadPool;
@@ -586,9 +598,12 @@ void SystemState::systemFinalize()
 	parameters.reset();
 	static_SoundMixer_soundTransform.reset();
 	frameListeners.clear();
-	for(auto it = sharedobjectmap.begin(); it != sharedobjectmap.end(); it++)
+	auto it = sharedobjectmap.begin();
+	while (it != sharedobjectmap.end())
+	{
 		it->second->doFlush();
-	sharedobjectmap.clear();
+		it = sharedobjectmap.erase(it);
+	}
 	mainClip->destroyTags();
 }
 
@@ -679,7 +694,7 @@ void SystemState::destroy()
 			builtinClasses[i]->finalize();
 	}
 	for(auto it = customClasses.begin(); it != customClasses.end(); ++it)
-		(*it)->finalize();
+		it->second->finalize();
 	for(auto it = templates.begin(); it != templates.end(); ++it)
 		it->second->finalize();
 
@@ -694,7 +709,7 @@ void SystemState::destroy()
 			builtinClasses[i]->decRef();
 	}
 	for(auto i = customClasses.begin(); i != customClasses.end(); ++i)
-		(*i)->decRef();
+		i->second->decRef();
 
 	//Free templates by decRef'ing them
 	for(auto i = templates.begin(); i != templates.end(); ++i)
@@ -801,6 +816,23 @@ void SystemState::removeWorker(ASWorker *w)
 	singleworker=workerDomain->workerlist->size() <= 1;
 
 }
+void SystemState::addEventToBackgroundWorkers(_NR<EventDispatcher> obj, _R<Event> ev)
+{
+	if(obj.isNull())
+		return;
+	
+	if (ev->is<WaitableEvent>())
+		return;
+	Locker l(workerMutex);
+	for (uint32_t i= 0; i < workerDomain->workerlist->size(); i++)
+	{
+		asAtom w = workerDomain->workerlist->at(i);
+		if (asAtomHandler::is<ASWorker>(w) && !asAtomHandler::as<ASWorker>(w)->isPrimordial && obj->hasEventListener(ev->type))
+		{
+			asAtomHandler::as<ASWorker>(w)->addEvent(obj,ev);
+		}
+	}
+}
 
 void SystemState::startRenderTicks()
 {
@@ -828,8 +860,8 @@ void SystemState::delayedCreation(SystemState* sys)
 {
 	sys->audioManager=new AudioManager(sys->engineData);
 	sys->localstorageallowed =sys->getEngineData()->getLocalStorageAllowedMarker();
-	int32_t reqWidth=sys->mainClip->getFrameSize().Xmax/20;
-	int32_t reqHeight=sys->mainClip->getFrameSize().Ymax/20;
+	int32_t reqWidth=(sys->mainClip->getFrameSize().Xmax-sys->mainClip->getFrameSize().Xmin)/20;
+	int32_t reqHeight=(sys->mainClip->getFrameSize().Ymax-sys->mainClip->getFrameSize().Ymin)/20;
 
 	if (EngineData::enablerendering)
 		sys->engineData->showWindow(reqWidth, reqHeight);
@@ -1195,20 +1227,24 @@ void SystemState::flushInvalidationQueue()
 	{
 		if(cur->isOnStage() && cur->hasChanged)
 		{
-			IDrawable* d=cur->invalidate(stage, MATRIX(),true);
+			_NR<DisplayObject> drawobj=cur;
+			_NR<DisplayObject> cachedBitmap;
+			IDrawable* d=cur->invalidate(stage, MATRIX(),true,nullptr, &cachedBitmap);
 			//Check if the drawable is valid and forge a new job to
 			//render it and upload it to GPU
 			if(d)
 			{
-				if (cur->getNeedsTextureRecalculation())
+				if (cachedBitmap)
+					drawobj = cachedBitmap;
+				if (drawobj->getNeedsTextureRecalculation())
 				{
 					drawjobLock.lock();
-					AsyncDrawJob* j = new AsyncDrawJob(d,cur);
-					if (!cur->getTextureRecalculationSkippable())
+					AsyncDrawJob* j = new AsyncDrawJob(d,drawobj);
+					if (!drawobj->getTextureRecalculationSkippable())
 					{
 						for (auto it = drawJobsPending.begin(); it != drawJobsPending.end(); it++)
 						{
-							if ((*it)->getOwner() == cur.getPtr())
+							if ((*it)->getOwner() == drawobj.getPtr())
 							{
 								// older drawjob currently running for this DisplayObject, abort it
 								(*it)->threadAborting=true;
@@ -1218,7 +1254,7 @@ void SystemState::flushInvalidationQueue()
 						}
 						for (auto it = drawJobsNew.begin(); it != drawJobsNew.end(); it++)
 						{
-							if ((*it)->getOwner() == cur.getPtr())
+							if ((*it)->getOwner() == drawobj.getPtr())
 							{
 								// older drawjob currently running for this DisplayObject, abort it
 								(*it)->threadAborting=true;
@@ -1232,10 +1268,11 @@ void SystemState::flushInvalidationQueue()
 					drawjobLock.unlock();
 				}
 				else
-					renderThread->addRefreshableSurface(d,cur);
+					renderThread->addRefreshableSurface(d,drawobj);
 			}
-			cur->hasChanged=false;
-			cur->resetNeedsTextureRecalculation();
+			drawobj->hasChanged=false;
+			if (getRenderThread()->isStarted())
+				drawobj->resetNeedsTextureRecalculation();
 		}
 		_NR<DisplayObject> next=cur->invalidateQueueNext;
 		cur->invalidateQueueNext=NullRef;
@@ -1314,8 +1351,8 @@ void ThreadProfile::plot(uint32_t maxTime, cairo_t *cr)
 
 	Locker locker(mutex);
 	RECT size=getSys()->mainClip->getFrameSize();
-	int width=size.Xmax/20;
-	int height=size.Ymax/20;
+	int width=(size.Xmax-size.Xmin)/20;
+	int height=(size.Ymax-size.Ymin)/20;
 	
 	float *vertex_coords = new float[data.size()*2];
 	float *color_coords = new float[data.size()*4];
@@ -1830,8 +1867,8 @@ void ParseThread::threadAbort()
 bool RootMovieClip::boundsRect(number_t& xmin, number_t& xmax, number_t& ymin, number_t& ymax) const
 {
 	RECT f=getFrameSize();
-	xmin=0;
-	ymin=0;
+	xmin=f.Xmin/20;
+	ymin=f.Ymin/20;
 	xmax=f.Xmax/20;
 	ymax=f.Ymax/20;
 	return true;
@@ -1984,8 +2021,6 @@ _NR<RootMovieClip> RootMovieClip::getRoot()
 
 _NR<Stage> RootMovieClip::getStage()
 {
-	if (!isConstructed())
-		return NullRef;
 	getSystemState()->stage->incRef();
 	return _MR(getSystemState()->stage);
 }
@@ -2127,7 +2162,21 @@ void SystemState::tick()
 			}
 		}
 	}
-	/* TODO: Step 7: dispatch render event (Assuming stage.invalidate() has been called) */
+	/* Step 7: dispatch render event (Assuming stage.invalidate() has been called) */
+	if (stage->invalidated)
+	{
+		RELEASE_WRITE(stage->invalidated,false);
+		Locker l(mutexFrameListeners);
+		if(!frameListeners.empty())
+		{
+			_R<Event> e(Class<Event>::getInstanceS(this,"render"));
+			auto it=frameListeners.begin();
+			for(;it!=frameListeners.end();it++)
+			{
+				getVm(this)->addEvent(*it,e);
+			}
+		}
+	}
 
 	/* Step 9: we are idle now, so we can handle all input events */
 	_R<IdleEvent> idle = _MR(new (unaccountedMemory) IdleEvent());
@@ -2215,6 +2264,8 @@ void SystemState::stageCoordinateMapping(uint32_t windowWidth, uint32_t windowHe
 {
 	//Get the size of the content
 	RECT r=mainClip->getFrameSize();
+	r.Xmin/=20;
+	r.Ymin/=20;
 	r.Xmax/=20;
 	r.Ymax/=20;
 	//Now compute the scalings and offsets
@@ -2223,65 +2274,65 @@ void SystemState::stageCoordinateMapping(uint32_t windowWidth, uint32_t windowHe
 		case SystemState::SHOW_ALL:
 			//Compute both scaling
 			scaleX=windowWidth;
-			scaleX/=r.Xmax;
+			scaleX/=(r.Xmax-r.Xmin);
 			scaleY=windowHeight;
-			scaleY/=r.Ymax;
+			scaleY/=(r.Ymax-r.Ymin);
 			//Enlarge with no distortion
 			if(scaleX<scaleY)
 			{
 				//Uniform scaling for Y
 				scaleY=scaleX;
 				//Apply the offset
-				offsetY=(windowHeight-r.Ymax*scaleY)/2;
-				offsetX=0;
+				offsetY=-r.Ymin+(windowHeight-(r.Ymax-r.Ymin)*scaleY)/2;
+				offsetX=-r.Xmin;
 			}
 			else
 			{
 				//Uniform scaling for X
 				scaleX=scaleY;
 				//Apply the offset
-				offsetX=(windowWidth-r.Xmax*scaleX)/2;
-				offsetY=0;
+				offsetX=-r.Xmin+(windowWidth-(r.Xmax-r.Xmin)*scaleX)/2;
+				offsetY=-r.Ymin;
 			}
 			break;
 		case SystemState::NO_BORDER:
 			//Compute both scaling
 			scaleX=windowWidth;
-			scaleX/=r.Xmax;
+			scaleX/=(r.Xmax-r.Xmin);
 			scaleY=windowHeight;
-			scaleY/=r.Ymax;
+			scaleY/=(r.Ymax-r.Ymin);
 			//Enlarge with no distortion
 			if(scaleX>scaleY)
 			{
 				//Uniform scaling for Y
 				scaleY=scaleX;
 				//Apply the offset
-				offsetY=(windowHeight-r.Ymax*scaleY)/2;
-				offsetX=0;
+				offsetY=-r.Ymin+(windowHeight-(r.Ymax-r.Ymin)*scaleY)/2;
+				offsetX=-r.Xmin;
 			}
 			else
 			{
 				//Uniform scaling for X
 				scaleX=scaleY;
 				//Apply the offset
-				offsetX=(windowWidth-r.Xmax*scaleX)/2;
-				offsetY=0;
+				offsetX=-r.Xmin+(windowWidth-(r.Xmax-r.Xmin)*scaleX)/2;
+				offsetY=-r.Ymin;
 			}
 			break;
 		case SystemState::EXACT_FIT:
 			//Compute both scaling
 			scaleX=windowWidth;
-			scaleX/=r.Xmax;
+			scaleX/=(r.Xmax-r.Xmin);
 			scaleY=windowHeight;
-			scaleY/=r.Ymax;
-			offsetX=0;
-			offsetY=0;
+			scaleY/=(r.Ymax-r.Ymin);
+			offsetX=-r.Xmin;
+			offsetY=-r.Ymin;
 			break;
 		case SystemState::NO_SCALE:
 			scaleX=1;
 			scaleY=1;
-			offsetX=0;
-			offsetY=0;
+			offsetX=-r.Xmin;
+			offsetY=-r.Ymin;
 			break;
 	}
 }
@@ -2310,6 +2361,13 @@ void SystemState::showMouseCursor(bool visible)
 		engineData->runInMainThread(this,&EngineData::showMouseCursor);
 	else
 		engineData->runInMainThread(this,&EngineData::hideMouseCursor);
+}
+void SystemState::setMouseHandCursor(bool sethand)
+{
+	if (sethand)
+		engineData->runInMainThread(this,&EngineData::setMouseHandCursor);
+	else
+		engineData->runInMainThread(this,&EngineData::resetMouseHandCursor);
 }
 
 void SystemState::waitRendering()
@@ -2439,7 +2497,11 @@ void RootMovieClip::addBinding(const tiny_string& name, DictionaryTag *tag)
 	// This function will be called only be the parsing thread,
 	// and will only access the last frame, so no locking needed.
 	tag->bindingclassname = name;
-	classesToBeBound.push_back(make_pair(name, tag));
+	uint32_t pos = name.rfind(".");
+	if (pos== tiny_string::npos)
+		classesToBeBound[QName(getSystemState()->getUniqueStringId(name),BUILTIN_STRINGS::EMPTY)] =  tag;
+	else
+		classesToBeBound[QName(getSystemState()->getUniqueStringId(name.substr(pos+1,name.numChars()-(pos+1))),getSystemState()->getUniqueStringId(name.substr(0,pos)))] = tag;
 }
 
 void RootMovieClip::bindClass(const QName& classname, Class_inherit* cls)
@@ -2447,23 +2509,11 @@ void RootMovieClip::bindClass(const QName& classname, Class_inherit* cls)
 	if (cls->isBinded() || classesToBeBound.empty())
 		return;
 
-	tiny_string clsname;
-	if (classname.nsStringId != BUILTIN_STRINGS::EMPTY)
-		clsname = getSystemState()->getStringFromUniqueId(classname.nsStringId) + ".";
-	clsname += getSystemState()->getStringFromUniqueId(classname.nameId);
-
-	auto it=classesToBeBound.begin();
-	for(;it!=classesToBeBound.end();++it)
+	auto it=classesToBeBound.find(classname);
+	if(it!=classesToBeBound.end())
 	{
-		if (it->first == clsname)
-		{
-			if(it->second->bindedTo==NULL)
-				it->second->bindedTo=cls;
-			
-			cls->bindToTag(it->second);
-			classesToBeBound.erase(it);
-			break;
-		}
+		cls->bindToTag(it->second);
+		classesToBeBound.erase(it);
 	}
 }
 
@@ -2471,7 +2521,7 @@ void RootMovieClip::checkBinding(DictionaryTag *tag)
 {
 	if (tag->bindingclassname.empty())
 		return;
-	multiname clsname(NULL);
+	multiname clsname(nullptr);
 	clsname.name_type=multiname::NAME_STRING;
 	clsname.isAttribute = false;
 
@@ -2491,7 +2541,7 @@ void RootMovieClip::checkBinding(DictionaryTag *tag)
 	clsname.name_s_id=getSystemState()->getUniqueStringId(nm);
 	clsname.ns.push_back(nsNameAndKind(getSystemState(),ns,NAMESPACE));
 	
-	ASObject* typeObject = NULL;
+	ASObject* typeObject = nullptr;
 	auto i = applicationDomain->classesBeingDefined.cbegin();
 	while (i != applicationDomain->classesBeingDefined.cend())
 	{
@@ -2502,7 +2552,7 @@ void RootMovieClip::checkBinding(DictionaryTag *tag)
 		}
 		i++;
 	}
-	if (typeObject == NULL)
+	if (typeObject == nullptr)
 	{
 		ASObject* target;
 		asAtom o=asAtomHandler::invalidAtom;
@@ -2510,14 +2560,13 @@ void RootMovieClip::checkBinding(DictionaryTag *tag)
 		if (asAtomHandler::isValid(o))
 			typeObject=asAtomHandler::getObject(o);
 	}
-	if (typeObject != NULL)
+	if (typeObject != nullptr)
 	{
 		Class_inherit* cls = typeObject->as<Class_inherit>();
 		if (cls)
 		{
 			ABCVm *vm = getVm(getSystemState());
-			vm->buildClassAndBindTag(tag->bindingclassname.raw_buf(), tag);
-			
+			vm->buildClassAndBindTag(tag->bindingclassname.raw_buf(), tag,cls);
 			tag->bindedTo=cls;
 			tag->bindingclassname = "";
 			cls->bindToTag(tag);
@@ -2573,6 +2622,11 @@ void RootMovieClip::setupAVM1RootMovie()
 		this->classdef = Class<AVM1MovieClip>::getRef(getSystemState()).getPtr();
 		if (!getSystemState()->avm1global)
 			getVm(getSystemState())->registerClassesAVM1();
+		// it seems that the url parameters and flash vars are made available as properties of the root movie clip
+		// I haven't found anything in the documentation but gnash also does this
+		_NR<ASObject> params = getSystemState()->getParameters();
+		if (params)
+			params->copyValues(this);
 	}
 }
 

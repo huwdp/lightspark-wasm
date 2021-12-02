@@ -51,6 +51,7 @@ SDL_Thread* EngineData::mainLoopThread = nullptr;
 bool EngineData::mainthread_running = false;
 bool EngineData::sdl_needinit = true;
 bool EngineData::enablerendering = true;
+SDL_Cursor* EngineData::handCursor = nullptr;
 Semaphore EngineData::mainthread_initialized(0);
 EngineData::EngineData() : contextmenu(nullptr),contextmenurenderer(nullptr),sdleventtickjob(nullptr),incontextmenu(false),incontextmenupreparing(false),currentPixelBufPtr(nullptr),pixelBufferWidth(0),pixelBufferHeight(0),widget(0), width(0), height(0),needrenderthread(true),supportPackedDepthStencil(false),hasExternalFontRenderer(false)
 {
@@ -66,6 +67,9 @@ EngineData::~EngineData()
 #endif
 		currentPixelBufPtr = nullptr;
 	}
+	if (handCursor)
+		SDL_FreeCursor(handCursor);
+	handCursor=nullptr;
 }
 bool EngineData::mainloop_handleevent(SDL_Event* event,SystemState* sys)
 {
@@ -635,6 +639,17 @@ void EngineData::showMouseCursor(SystemState* /*sys*/)
 void EngineData::hideMouseCursor(SystemState* /*sys*/)
 {
 	SDL_ShowCursor(SDL_DISABLE);
+}
+
+void EngineData::setMouseHandCursor(SystemState* /*sys*/)
+{
+	if (!handCursor)
+		handCursor = SDL_CreateSystemCursor(SDL_SystemCursor::SDL_SYSTEM_CURSOR_HAND);
+	SDL_SetCursor(handCursor);
+}
+void EngineData::resetMouseHandCursor(SystemState* /*sys*/)
+{
+	SDL_SetCursor(SDL_GetDefaultCursor());
 }
 
 void EngineData::setClipboardText(const std::string txt)
@@ -1304,7 +1319,7 @@ int EngineData::audio_StreamInit(AudioStream* s)
 
 
 	mixer_channel = Mix_PlayChannel(-1, chunk, -1);
-	Mix_RegisterEffect(mixer_channel, mixer_effect_ffmpeg_cb, NULL, s);
+	Mix_RegisterEffect(mixer_channel, mixer_effect_ffmpeg_cb, nullptr, s);
 	Mix_Resume(mixer_channel);
 	return mixer_channel;
 }
@@ -1326,10 +1341,20 @@ void EngineData::audio_StreamSetVolume(int channel, double volume)
 		Mix_Volume(channel, curvolume);
 }
 
+void EngineData::audio_StreamSetPanning(int channel, uint16_t left, uint16_t right)
+{
+	if (channel != -1)
+		Mix_SetPanning(channel,left/256,right/256);
+}
+
 void EngineData::audio_StreamDeinit(int channel)
 {
 	if (channel != -1)
+	{
+		Mix_Chunk*chunk = Mix_GetChunk(channel);
 		Mix_HaltChannel(channel);
+		Mix_FreeChunk(chunk);
+	}
 }
 
 bool EngineData::audio_ManagerInit()
@@ -1349,7 +1374,11 @@ void EngineData::audio_ManagerCloseMixer()
 
 bool EngineData::audio_ManagerOpenMixer()
 {
-	return Mix_OpenAudio (audio_getSampleRate(), AUDIO_S16, 2, LIGHTSPARK_AUDIO_BUFFERSIZE) >= 0;
+#if __BYTE_ORDER == __BIG_ENDIAN
+	return Mix_OpenAudio (audio_getSampleRate(), AUDIO_S16MSB, 2, LIGHTSPARK_AUDIO_BUFFERSIZE) >= 0;
+#else
+	return Mix_OpenAudio (audio_getSampleRate(), AUDIO_S16LSB, 2, LIGHTSPARK_AUDIO_BUFFERSIZE) >= 0;
+#endif
 }
 
 void EngineData::audio_ManagerDeinit()
@@ -1364,30 +1393,32 @@ int EngineData::audio_getSampleRate()
 	return MIX_DEFAULT_FREQUENCY;
 }
 
-IDrawable *EngineData::getTextRenderDrawable(const TextData &_textData, const MATRIX &_m, int32_t _x, int32_t _y, int32_t _w, int32_t _h, int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r, float _xs, float _ys, bool _im, bool _hm, float _s, float _a, const std::vector<IDrawable::MaskData> &_ms, float _redMultiplier, float _greenMultiplier, float _blueMultiplier, float _alphaMultiplier, float _redOffset, float _greenOffset, float _blueOffset, float _alphaOffset, bool smoothing)
+IDrawable *EngineData::getTextRenderDrawable(const TextData &_textData, const MATRIX &_m, int32_t _x, int32_t _y, int32_t _w, int32_t _h, int32_t _rx, int32_t _ry, int32_t _rw, int32_t _rh, float _r, float _xs, float _ys, bool _im, _NR<DisplayObject> _mask, float _s, float _a, const std::vector<IDrawable::MaskData> &_ms, float _redMultiplier, float _greenMultiplier, float _blueMultiplier, float _alphaMultiplier, float _redOffset, float _greenOffset, float _blueOffset, float _alphaOffset, bool smoothing)
 {
 	if (hasExternalFontRenderer)
-		return new externalFontRenderer(_textData,this, _x, _y, _w, _h, _rx,_ry,_rw,_rh,_r,_xs,_ys,_im,_hm, _a, _ms,
+		return new externalFontRenderer(_textData,this, _x, _y, _w, _h, _rx,_ry,_rw,_rh,_r,_xs,_ys,_im, _mask, _a, _ms,
 										_redMultiplier,_greenMultiplier,_blueMultiplier,_alphaMultiplier,
 										_redOffset,_greenOffset,_blueOffset,_alphaOffset,
-										smoothing);
+										smoothing,_m);
 	return nullptr;
 }
 
-externalFontRenderer::externalFontRenderer(const TextData &_textData, EngineData *engine, int32_t x, int32_t y, int32_t w, int32_t h, int32_t rx, int32_t ry, int32_t rw, int32_t rh, float r, float xs, float ys, bool im, bool hm, float a, const std::vector<IDrawable::MaskData> &m,
+externalFontRenderer::externalFontRenderer(const TextData &_textData, EngineData *engine, int32_t x, int32_t y, int32_t w, int32_t h, int32_t rx, int32_t ry, int32_t rw, int32_t rh, float r, float xs, float ys, bool im, _NR<DisplayObject> _mask, float a, const std::vector<IDrawable::MaskData> &m,
 										   float _redMultiplier,float _greenMultiplier,float _blueMultiplier,float _alphaMultiplier,
 										   float _redOffset,float _greenOffset,float _blueOffset,float _alphaOffset,
-										   bool smoothing)
-	: IDrawable(w, h, x, y,rw,rh,rx,ry,r,xs,ys,im,hm, a, m,
+										   bool smoothing, const MATRIX &_m)
+	: IDrawable(w, h, x, y,rw,rh,rx,ry,r,xs,ys,im,_mask, a, m,
 				_redMultiplier,_greenMultiplier,_blueMultiplier,_alphaMultiplier,
-				_redOffset,_greenOffset,_blueOffset,_alphaOffset),m_engine(engine)
+				_redOffset,_greenOffset,_blueOffset,_alphaOffset,smoothing,_m),m_engine(engine)
 {
 	externalressource = engine->setupFontRenderer(_textData,a,smoothing);
 }
 
-uint8_t *externalFontRenderer::getPixelBuffer(float scalex, float scaley, bool *isBufferOwner)
+uint8_t *externalFontRenderer::getPixelBuffer(bool *isBufferOwner, uint32_t* bufsize)
 {
 	if (isBufferOwner)
 		*isBufferOwner = true;
+	if (bufsize)
+		*bufsize=width*height*4;
 	return m_engine->getFontPixelBuffer(externalressource,this->width,this->height);
 }
